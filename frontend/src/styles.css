@@ -262,6 +262,14 @@ textarea {
   padding: 12px 16px;
   border-radius: 12px;
 }
+.primary-action {
+  border: 0;
+  border-radius: 12px;
+  background: var(--lime);
+  color: #171717;
+  padding: 13px 20px;
+  font-weight: 800;
+}
 .venue-banner {
   background: linear-gradient(110deg, #321b2a, #252623);
   border: 1px solid #4b3340;
@@ -337,6 +345,9 @@ textarea {
   color: var(--lime);
   display: flex;
   gap: 4px;
+}
+.down {
+  color: #ff8e8e;
 }
 .grid {
   display: grid;
@@ -644,6 +655,46 @@ textarea {
   grid-template-columns: repeat(2, 1fr);
   gap: 18px;
 }
+.venue-editor {
+  display: grid;
+  grid-template-columns: 1.2fr repeat(4, 1fr) auto auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 18px;
+}
+.venue-editor h2 {
+  font: 28px "Bebas Neue";
+  margin: 5px 0 0;
+}
+.venue-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.venue-editor input {
+  background: var(--panel2);
+  border: 1px solid #454648;
+  color: white;
+  padding: 12px;
+  border-radius: 10px;
+  min-width: 0;
+}
+.venue-editor button {
+  border: 0;
+  border-radius: 10px;
+  background: var(--lime);
+  padding: 12px;
+  font-weight: 800;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.venue-editor .text-action {
+  background: transparent;
+  color: #aaa;
+}
 .venue-card {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -677,6 +728,190 @@ textarea {
   font-size: 9px;
   letter-spacing: 0.13em;
   color: var(--lime);
+}
+.status.active,
+.status.approved {
+  color: var(--lime);
+}
+.status.paused,
+.status.pending,
+.status.draft {
+  color: #f3bf65;
+}
+.customer-grid,
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 0.75fr;
+  gap: 14px;
+}
+.segment-row {
+  display: grid;
+  grid-template-columns: 1fr auto 65px;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+}
+.segment-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.segment-row span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.segment-row > b {
+  font: 28px "Bebas Neue";
+}
+.segment-row em {
+  font-style: normal;
+  font-size: 11px;
+  justify-self: end;
+}
+.activity-row {
+  display: grid;
+  grid-template-columns: 145px 1fr 28px;
+  gap: 12px;
+  align-items: center;
+  padding: 15px 0;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+}
+.privacy-note {
+  display: flex;
+  gap: 12px;
+  background: #30351f;
+  color: #dfe9b5;
+  padding: 14px;
+  border-radius: 12px;
+  margin-top: 18px;
+  font-size: 12px;
+}
+.privacy-note p {
+  margin: 0;
+  line-height: 1.5;
+}
+.offer-form {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 15px;
+  align-items: end;
+  margin-bottom: 18px;
+}
+.offer-form label,
+.settings-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.offer-form input,
+.offer-form select,
+.settings-form input,
+.settings-form select {
+  background: var(--panel2);
+  border: 1px solid #454648;
+  color: white;
+  padding: 13px;
+  border-radius: 10px;
+}
+.offer-form button,
+.settings-form button {
+  border: 0;
+  border-radius: 11px;
+  background: var(--lime);
+  color: #171717;
+  padding: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.offer-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.offer-card h2 {
+  font: 32px "Bebas Neue";
+  margin: 22px 0 5px;
+}
+.offer-card > p {
+  min-height: 44px;
+  color: #ccc;
+}
+.offer-card > small {
+  color: var(--muted);
+}
+.offer-top {
+  display: flex;
+  justify-content: space-between;
+}
+.offer-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.offer-stats div {
+  display: flex;
+  flex-direction: column;
+}
+.offer-stats strong {
+  font: 25px "Bebas Neue";
+}
+.offer-stats span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.offer-toggle {
+  border: 0;
+  background: transparent;
+  color: var(--lime);
+  font-weight: 700;
+  display: flex;
+  gap: 7px;
+  margin-top: 20px;
+  padding: 0;
+}
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+}
+.settings-form input:disabled {
+  opacity: 0.55;
+}
+.settings-form .check {
+  flex-direction: row;
+  align-items: center;
+  font-weight: 500;
+}
+.settings-form .check input {
+  accent-color: var(--lime);
+}
+.account-card h2 {
+  font: 38px "Bebas Neue";
+  margin-bottom: 5px;
+}
+.account-card > p {
+  color: var(--muted);
+  margin-top: 0;
+}
+.account-card > div:not(.privacy-note) {
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+}
+.account-card > div span {
+  color: var(--muted);
 }
 .loading {
   min-height: 100vh;
@@ -717,7 +952,18 @@ textarea {
     grid-template-columns: repeat(2, 1fr);
   }
   .grid,
-  .claim-layout {
+  .claim-layout,
+  .customer-grid,
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .offer-list {
+    grid-template-columns: 1fr;
+  }
+  .offer-form {
+    grid-template-columns: 1fr;
+  }
+  .venue-editor {
     grid-template-columns: 1fr;
   }
   .venue-cards {

@@ -3,14 +3,18 @@ import { createRoot } from "react-dom/client";
 import {
   BarChart3,
   Building2,
+  CalendarDays,
   ChevronRight,
   Coffee,
   Gift,
   LayoutDashboard,
   LogOut,
   MapPin,
+  Pause,
+  Play,
   Megaphone,
   Search,
+  Save,
   Settings,
   ShieldCheck,
   Store,
@@ -173,6 +177,12 @@ function Shell({ business, onLogout }) {
           <Claim />
         ) : page === "venues" ? (
           <Venues />
+        ) : page === "customers" ? (
+          <Customers />
+        ) : page === "promotions" ? (
+          <Promotions />
+        ) : page === "settings" ? (
+          <BusinessSettings business={business} />
         ) : (
           <Coming page={page} />
         )}
@@ -521,10 +531,33 @@ function Claim() {
 }
 
 function Venues() {
-  const [claims, setClaims] = useState([]);
+  const [claims, setClaims] = useState([]),
+    [owned, setOwned] = useState([]),
+    [editing, setEditing] = useState(null),
+    [saved, setSaved] = useState(false);
+  const load = () =>
+    Promise.all([request("/claims"), request("/venues")]).then(([a, b]) => {
+      setClaims(a);
+      setOwned(b);
+    });
   useEffect(() => {
-    request("/claims").then(setClaims);
+    load();
   }, []);
+  const save = async (e) => {
+    e.preventDefault();
+    const updated = await request(`/venues/${editing.id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        category: e.target.category.value,
+        address: e.target.address.value,
+        city: e.target.city.value,
+        postcode: e.target.postcode.value,
+      }),
+    });
+    setEditing(updated);
+    setSaved(true);
+    await load();
+  };
   return (
     <>
       <header>
@@ -534,6 +567,41 @@ function Venues() {
           <p>Manage verified locations and track claims in progress.</p>
         </div>
       </header>
+      {editing && (
+        <form className="panel venue-editor" onSubmit={save}>
+          <div>
+            <span className="eyebrow">PUBLIC LISTING</span>
+            <h2>Edit {editing.name}</h2>
+          </div>
+          <label>
+            Category
+            <input name="category" defaultValue={editing.category} required />
+          </label>
+          <label>
+            Address
+            <input name="address" defaultValue={editing.address} required />
+          </label>
+          <label>
+            City
+            <input name="city" defaultValue={editing.city} required />
+          </label>
+          <label>
+            Postcode
+            <input name="postcode" defaultValue={editing.postcode} required />
+          </label>
+          <button>
+            {saved ? "Saved" : "Save listing"}
+            <Save size={16} />
+          </button>
+          <button
+            type="button"
+            className="text-action"
+            onClick={() => setEditing(null)}
+          >
+            Close
+          </button>
+        </form>
+      )}
       <section className="venue-cards">
         {claims.map((c) => (
           <article className="venue-card" key={c.id}>
@@ -544,13 +612,368 @@ function Venues() {
               <p>
                 {c.address}, {c.city}
               </p>
-              <button>
+              <button
+                onClick={() =>
+                  c.status === "approved" &&
+                  setEditing(owned.find((v) => v.id === c.venue_id))
+                }
+              >
                 {c.status === "approved" ? "Manage venue" : "View claim"}
                 <ChevronRight size={15} />
               </button>
             </div>
           </article>
         ))}
+      </section>
+    </>
+  );
+}
+
+function Customers() {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    request("/customers").then(setData);
+  }, []);
+  if (!data) return <div className="loading">Reading guest signals…</div>;
+  const cards = [
+    [
+      "Reachable guests",
+      money(data.summary.reachable),
+      "Followers you can engage",
+    ],
+    [
+      "New this month",
+      data.summary.new_this_month,
+      "First-time venue visitors",
+    ],
+    ["Return rate", data.summary.return_rate + "%", "Guests who came back"],
+    ["Average visits", data.summary.average_visits, "Per returning guest"],
+  ];
+  return (
+    <>
+      <header>
+        <div>
+          <span className="eyebrow">CUSTOMER INSIGHTS</span>
+          <h1>Build a loyal crowd.</h1>
+          <p>
+            Privacy-safe audience trends from activity at your verified venue.
+          </p>
+        </div>
+      </header>
+      <section className="metrics compact-metrics">
+        {cards.map(([label, value, note]) => (
+          <article className="metric" key={label}>
+            <div>
+              <span>{label}</span>
+              <Users size={19} />
+            </div>
+            <strong>{value}</strong>
+            <small>{note}</small>
+          </article>
+        ))}
+      </section>
+      <section className="customer-grid">
+        <article className="panel">
+          <div className="panel-head">
+            <div>
+              <span>AUDIENCE SEGMENTS</span>
+              <h2>Who to bring back</h2>
+            </div>
+          </div>
+          {data.segments.map((x) => (
+            <div className="segment-row" key={x.name}>
+              <div>
+                <strong>{x.name}</strong>
+                <span>{x.description}</span>
+              </div>
+              <b>{x.count}</b>
+              <em className={x.change < 0 ? "down" : "up"}>
+                {x.change > 0 ? "+" : ""}
+                {x.change}%
+              </em>
+            </div>
+          ))}
+        </article>
+        <article className="panel">
+          <div className="panel-head">
+            <div>
+              <span>LAST 30 DAYS</span>
+              <h2>Guest actions</h2>
+            </div>
+          </div>
+          {data.activity.map((x) => (
+            <div className="activity-row" key={x.label}>
+              <span>{x.label}</span>
+              <div className="line">
+                <i style={{ width: Math.min(100, x.count) + "%" }} />
+              </div>
+              <strong>{x.count}</strong>
+            </div>
+          ))}
+          <div className="privacy-note">
+            <ShieldCheck size={20} />
+            <p>
+              <strong>Built for trust.</strong>
+              <br />
+              Siply only shows aggregated trends—never private guest identities.
+            </p>
+          </div>
+        </article>
+      </section>
+    </>
+  );
+}
+
+function Promotions() {
+  const [offers, setOffers] = useState([]),
+    [venues, setVenues] = useState([]),
+    [open, setOpen] = useState(false),
+    [message, setMessage] = useState("");
+  const load = () =>
+    Promise.all([request("/promotions"), request("/venues")]).then(([a, b]) => {
+      setOffers(a);
+      setVenues(b);
+    });
+  useEffect(() => {
+    load();
+  }, []);
+  const create = async (e) => {
+    e.preventDefault();
+    setMessage("");
+    try {
+      await request("/promotions", {
+        method: "POST",
+        body: JSON.stringify({
+          venue_id: e.target.venue.value,
+          title: e.target.title.value,
+          offer: e.target.offer.value,
+          starts_at: e.target.starts.value,
+          ends_at: e.target.ends.value,
+        }),
+      });
+      setOpen(false);
+      await load();
+    } catch (x) {
+      setMessage(x.message);
+    }
+  };
+  const status = async (id, next) => {
+    await request(`/promotions/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: next }),
+    });
+    await load();
+  };
+  return (
+    <>
+      <header>
+        <div>
+          <span className="eyebrow">GUEST GROWTH</span>
+          <h1>Offers worth returning for.</h1>
+          <p>Create targeted incentives and follow their performance.</p>
+        </div>
+        <button className="primary-action" onClick={() => setOpen(!open)}>
+          {open ? "Close form" : "Create offer"}
+        </button>
+      </header>
+      {open && (
+        <form className="panel offer-form" onSubmit={create}>
+          <div>
+            <span className="eyebrow">NEW OFFER</span>
+            <h2>Plan a promotion</h2>
+          </div>
+          <label>
+            Venue
+            <select name="venue">
+              {venues.map((v) => (
+                <option value={v.id} key={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Campaign name
+            <input name="title" required placeholder="Tuesday pick-me-up" />
+          </label>
+          <label>
+            Guest offer
+            <input
+              name="offer"
+              required
+              placeholder="20% off hot drinks after 2pm"
+            />
+          </label>
+          <label>
+            Starts
+            <input name="starts" type="date" required />
+          </label>
+          <label>
+            Ends
+            <input name="ends" type="date" required />
+          </label>
+          {message && <div className="error">{message}</div>}
+          <button>
+            Save as draft <Save size={16} />
+          </button>
+        </form>
+      )}
+      <section className="offer-list">
+        {offers.length === 0 ? (
+          <div className="empty panel">
+            <Gift size={42} />
+            <h2>No offers yet</h2>
+            <p>Create your first campaign to encourage a quieter-day visit.</p>
+          </div>
+        ) : (
+          offers.map((x) => (
+            <article className="panel offer-card" key={x.id}>
+              <div className="offer-top">
+                <span className={"status " + x.status}>{x.status}</span>
+                <CalendarDays size={18} />
+              </div>
+              <h2>{x.title}</h2>
+              <p>{x.offer}</p>
+              <small>
+                {x.starts_at} → {x.ends_at}
+              </small>
+              <div className="offer-stats">
+                <div>
+                  <strong>{x.views}</strong>
+                  <span>Views</span>
+                </div>
+                <div>
+                  <strong>{x.saves}</strong>
+                  <span>Saves</span>
+                </div>
+                <div>
+                  <strong>{x.redemptions}</strong>
+                  <span>Redemptions</span>
+                </div>
+              </div>
+              <button
+                className="offer-toggle"
+                onClick={() =>
+                  status(x.id, x.status === "active" ? "paused" : "active")
+                }
+              >
+                {x.status === "active" ? (
+                  <>
+                    <Pause size={15} />
+                    Pause offer
+                  </>
+                ) : (
+                  <>
+                    <Play size={15} />
+                    Publish offer
+                  </>
+                )}
+              </button>
+            </article>
+          ))
+        )}
+      </section>
+    </>
+  );
+}
+
+function BusinessSettings({ business }) {
+  const [settings, setSettings] = useState(null),
+    [saved, setSaved] = useState(false);
+  useEffect(() => {
+    request("/settings").then(setSettings);
+  }, []);
+  if (!settings)
+    return <div className="loading">Opening business settings…</div>;
+  const submit = async (e) => {
+    e.preventDefault();
+    await request("/settings", {
+      method: "PUT",
+      body: JSON.stringify({
+        contact_name: e.target.contact.value,
+        phone: e.target.phone.value,
+        digest_frequency: e.target.digest.value,
+        marketing_opt_in: e.target.marketing.checked,
+      }),
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+  return (
+    <>
+      <header>
+        <div>
+          <span className="eyebrow">ACCOUNT & NOTIFICATIONS</span>
+          <h1>Business settings.</h1>
+          <p>
+            Manage the people and updates connected to your Siply workspace.
+          </p>
+        </div>
+      </header>
+      <section className="settings-grid">
+        <form className="panel settings-form" onSubmit={submit}>
+          <div className="panel-head">
+            <div>
+              <span>PRIMARY CONTACT</span>
+              <h2>Contact details</h2>
+            </div>
+          </div>
+          <label>
+            Contact name
+            <input name="contact" defaultValue={settings.contact_name} />
+          </label>
+          <label>
+            Business email
+            <input value={business.email} disabled />
+          </label>
+          <label>
+            Phone number
+            <input name="phone" defaultValue={settings.phone} />
+          </label>
+          <label>
+            Performance digest
+            <select name="digest" defaultValue={settings.digest_frequency}>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
+          <label className="check">
+            <input
+              name="marketing"
+              type="checkbox"
+              defaultChecked={settings.marketing_opt_in}
+            />
+            <span>Send product news and partner opportunities</span>
+          </label>
+          <button>
+            {saved ? "Saved successfully" : "Save changes"} <Save size={16} />
+          </button>
+        </form>
+        <article className="panel account-card">
+          <span className="eyebrow">WORKSPACE</span>
+          <h2>{business.name}</h2>
+          <p>{business.legal_name}</p>
+          <div>
+            <span>Plan</span>
+            <strong>{business.plan}</strong>
+          </div>
+          <div>
+            <span>Access</span>
+            <strong>Verified partner</strong>
+          </div>
+          <div>
+            <span>Security</span>
+            <strong>7-day session</strong>
+          </div>
+          <div className="privacy-note">
+            <ShieldCheck size={20} />
+            <p>
+              Venue and customer analytics are restricted to approved locations.
+            </p>
+          </div>
+        </article>
       </section>
     </>
   );

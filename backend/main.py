@@ -41,6 +41,7 @@ def setup() -> None:
         CREATE TABLE IF NOT EXISTS venues (id TEXT PRIMARY KEY, name TEXT NOT NULL, category TEXT NOT NULL, address TEXT NOT NULL, city TEXT NOT NULL, postcode TEXT, latitude REAL, longitude REAL, claimed INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS claims (id TEXT PRIMARY KEY, business_id TEXT NOT NULL, venue_id TEXT NOT NULL, role TEXT NOT NULL, evidence_type TEXT NOT NULL, evidence_note TEXT, status TEXT NOT NULL, submitted_at TEXT NOT NULL, reviewed_at TEXT);
         CREATE TABLE IF NOT EXISTS promotions (id TEXT PRIMARY KEY, business_id TEXT NOT NULL, venue_id TEXT NOT NULL, title TEXT NOT NULL, offer TEXT NOT NULL, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL, status TEXT NOT NULL, views INTEGER NOT NULL DEFAULT 0, saves INTEGER NOT NULL DEFAULT 0, redemptions INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS business_settings (business_id TEXT PRIMARY KEY, contact_name TEXT NOT NULL, phone TEXT, digest_frequency TEXT NOT NULL DEFAULT 'weekly', marketing_opt_in INTEGER NOT NULL DEFAULT 1);
         """)
         c.execute("INSERT OR IGNORE INTO businesses VALUES (?,?,?,?,?,?,?)", ("biz-northstar", "North Star Coffee", "North Star Coffee Ltd", "owner@northstarcoffee.co.uk", hash_password("SiplyBusiness!"), "Growth", now()))
         venues = [
@@ -51,6 +52,8 @@ def setup() -> None:
         ]
         c.executemany("INSERT OR IGNORE INTO venues VALUES (?,?,?,?,?,?,?,?,?)", venues)
         c.execute("INSERT OR IGNORE INTO claims VALUES (?,?,?,?,?,?,?,?,?)", ("claim-approved", "biz-northstar", "venue-northstar", "Owner", "business_email", "Domain email verified", "approved", now(), now()))
+        c.execute("INSERT OR IGNORE INTO business_settings VALUES (?,?,?,?,?)", ("biz-northstar", "Venue Owner", "+44 141 555 0132", "weekly", 1))
+        c.execute("INSERT OR IGNORE INTO promotions VALUES (?,?,?,?,?,?,?,?,?,?,?)", ("promo-welcome", "biz-northstar", "venue-northstar", "Tuesday pick-me-up", "20% off any hot drink after 2pm", "2026-11-17", "2026-12-17", "active", 684, 91, 34))
 
 
 setup()
@@ -74,6 +77,24 @@ class PromotionCreate(BaseModel):
     offer: str = Field(min_length=3, max_length=160)
     starts_at: str
     ends_at: str
+
+
+class PromotionStatus(BaseModel):
+    status: Literal["draft", "active", "paused", "ended"]
+
+
+class VenueUpdate(BaseModel):
+    category: str = Field(min_length=2, max_length=80)
+    address: str = Field(min_length=3, max_length=140)
+    city: str = Field(min_length=2, max_length=80)
+    postcode: str = Field(min_length=2, max_length=16)
+
+
+class SettingsUpdate(BaseModel):
+    contact_name: str = Field(min_length=2, max_length=100)
+    phone: str = Field(max_length=30)
+    digest_frequency: Literal["daily", "weekly", "monthly", "off"]
+    marketing_opt_in: bool
 
 
 def current_business(authorization: str | None = Header(default=None), connection=Depends(db)):
@@ -131,6 +152,19 @@ def scoped_venues(connection, business_id: str):
     return connection.execute("SELECT v.* FROM claims c JOIN venues v ON v.id=c.venue_id WHERE c.business_id=? AND c.status='approved'", (business_id,)).fetchall()
 
 
+@app.get("/api/venues")
+def owned_venues(connection=Depends(db), business=Depends(current_business)):
+    return [dict(row) for row in scoped_venues(connection, business["id"])]
+
+
+@app.put("/api/venues/{venue_id}")
+def update_venue(venue_id: str, payload: VenueUpdate, connection=Depends(db), business=Depends(current_business)):
+    owned = connection.execute("SELECT 1 FROM claims WHERE business_id=? AND venue_id=? AND status='approved'", (business["id"], venue_id)).fetchone()
+    if not owned: raise HTTPException(403, "You can only edit verified venues")
+    connection.execute("UPDATE venues SET category=?,address=?,city=?,postcode=? WHERE id=?", (payload.category, payload.address, payload.city, payload.postcode, venue_id)); connection.commit()
+    return dict(connection.execute("SELECT * FROM venues WHERE id=?", (venue_id,)).fetchone())
+
+
 @app.get("/api/dashboard")
 def dashboard(period: Literal["7d", "30d", "90d"] = "30d", connection=Depends(db), business=Depends(current_business)):
     venues = scoped_venues(connection, business["id"])
@@ -155,3 +189,40 @@ def create_promotion(payload: PromotionCreate, connection=Depends(db), business=
     connection.execute("INSERT INTO promotions VALUES (?,?,?,?,?,?,?,?,?,?,?)", (promo_id, business["id"], payload.venue_id, payload.title, payload.offer, payload.starts_at, payload.ends_at, "draft", 0, 0, 0)); connection.commit()
     return {"id": promo_id, "status": "draft"}
 
+
+@app.patch("/api/promotions/{promotion_id}")
+def update_promotion_status(promotion_id: str, payload: PromotionStatus, connection=Depends(db), business=Depends(current_business)):
+    row = connection.execute("SELECT * FROM promotions WHERE id=? AND business_id=?", (promotion_id, business["id"])).fetchone()
+    if not row: raise HTTPException(404, "Offer not found")
+    connection.execute("UPDATE promotions SET status=? WHERE id=?", (payload.status, promotion_id)); connection.commit()
+    return {"id": promotion_id, "status": payload.status}
+
+
+@app.get("/api/customers")
+def customers(connection=Depends(db), business=Depends(current_business)):
+    if not scoped_venues(connection, business["id"]): return {"segments": [], "activity": []}
+    return {
+        "summary": {"reachable": 584, "new_this_month": 72, "return_rate": 40, "average_visits": 2.7},
+        "segments": [
+            {"name": "Regulars", "description": "Visited 3+ times in 60 days", "count": 126, "change": 12},
+            {"name": "New guests", "description": "First visit in the last 30 days", "count": 192, "change": 18},
+            {"name": "At risk", "description": "No return visit in 45 days", "count": 48, "change": -6},
+            {"name": "Siply followers", "description": "Following your venue profile", "count": 584, "change": 9},
+        ],
+        "activity": [
+            {"label": "Saved your venue", "count": 91}, {"label": "Logged a drink", "count": 74},
+            {"label": "Redeemed an offer", "count": 34}, {"label": "Left a rating", "count": 27},
+        ],
+    }
+
+
+@app.get("/api/settings")
+def get_settings(connection=Depends(db), business=Depends(current_business)):
+    row = connection.execute("SELECT * FROM business_settings WHERE business_id=?", (business["id"],)).fetchone()
+    return {**dict(row), "marketing_opt_in": bool(row["marketing_opt_in"])}
+
+
+@app.put("/api/settings")
+def update_settings(payload: SettingsUpdate, connection=Depends(db), business=Depends(current_business)):
+    connection.execute("UPDATE business_settings SET contact_name=?,phone=?,digest_frequency=?,marketing_opt_in=? WHERE business_id=?", (payload.contact_name, payload.phone, payload.digest_frequency, int(payload.marketing_opt_in), business["id"])); connection.commit()
+    return {"saved": True}
