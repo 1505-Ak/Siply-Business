@@ -214,6 +214,19 @@ textarea {
   flex-direction: column;
   gap: 6px;
 }
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 16px;
+}
+.nav-group > span {
+  color: #686a69;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  font-weight: 800;
+  padding: 0 14px 5px;
+}
 .shell nav button,
 .logout {
   border: 0;
@@ -315,6 +328,58 @@ textarea {
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
   margin: 18px 0;
+}
+.free-metrics {
+  grid-template-columns: repeat(3, 1fr);
+}
+.pro-area,
+.customer-pro {
+  position: relative;
+}
+.pro-area.locked > article,
+.customer-pro.locked > section {
+  filter: blur(3px);
+  opacity: 0.34;
+  pointer-events: none;
+  user-select: none;
+}
+.pro-lock {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(430px, 88%);
+  text-align: center;
+  background: #18191a;
+  border: 1px solid #4a4c36;
+  border-radius: 22px;
+  padding: 28px;
+  box-shadow: 0 22px 60px #000c;
+}
+.pro-lock svg {
+  color: var(--lime);
+}
+.pro-lock h2 {
+  font: 32px "Bebas Neue";
+  margin: 9px 0;
+}
+.pro-lock p {
+  color: #aaa;
+  line-height: 1.5;
+}
+.pro-lock button {
+  border: 0;
+  border-radius: 11px;
+  background: var(--lime);
+  padding: 12px 18px;
+  font-weight: 800;
+}
+.customer-pro {
+  min-height: 560px;
+}
+.customer-pro > .pro-lock {
+  top: 46%;
 }
 .metric,
 .panel {
@@ -527,6 +592,34 @@ textarea {
   background: #333;
   display: grid;
   place-items: center;
+}
+.named-steps > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.named-steps b {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.claim-history {
+  margin-top: 18px;
+}
+.claim-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  border-top: 1px solid var(--line);
+}
+.claim-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.claim-row span {
+  color: var(--muted);
+  font-size: 12px;
 }
 .steps span.active,
 .steps span.done {
@@ -799,6 +892,30 @@ textarea {
   align-items: end;
   margin-bottom: 18px;
 }
+.offer-templates {
+  grid-column: 1/-1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.offer-templates > span {
+  color: var(--muted);
+  font-size: 12px;
+  margin-right: 4px;
+}
+.offer-templates button,
+.secondary-action {
+  border: 1px solid #4b4c4e;
+  background: transparent;
+  color: #ddd;
+  border-radius: 999px;
+  padding: 9px 13px;
+}
+.offer-form .check {
+  flex-direction: row;
+  align-items: center;
+}
 .offer-form label,
 .settings-form label {
   display: flex;
@@ -913,6 +1030,347 @@ textarea {
 .account-card > div span {
   color: var(--muted);
 }
+.upgrade-button {
+  width: 100%;
+  border: 0;
+  border-radius: 11px;
+  background: var(--lime);
+  padding: 13px;
+  font-weight: 800;
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+}
+.account-actions {
+  display: flex !important;
+  flex-direction: column;
+  align-items: stretch !important;
+  gap: 8px;
+}
+.account-actions button {
+  border: 1px solid #444;
+  background: transparent;
+  color: #ddd;
+  border-radius: 9px;
+  padding: 10px;
+}
+.account-actions .danger-text {
+  color: #ff8e8e;
+  border-color: #653b3b;
+}
+.composer {
+  margin-bottom: 18px;
+}
+.composer-tabs {
+  display: flex;
+  gap: 7px;
+  margin-bottom: 15px;
+}
+.composer-tabs button {
+  border: 0;
+  background: #303133;
+  color: #aaa;
+  padding: 10px 15px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+.composer-tabs button.active {
+  background: #30351f;
+  color: var(--lime);
+}
+.composer textarea {
+  width: 100%;
+  min-height: 145px;
+  background: var(--panel2);
+  border: 1px solid #444;
+  color: white;
+  border-radius: 14px;
+  padding: 16px;
+  resize: vertical;
+}
+.composer-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.composer-link select {
+  background: var(--panel2);
+  border: 1px solid #444;
+  color: white;
+  border-radius: 9px;
+  padding: 9px;
+}
+.composer-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.composer-foot > span {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+.photo-action,
+.post-card footer button {
+  border: 0;
+  background: transparent;
+  color: #ccc;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.post-preview {
+  width: min(420px, 100%);
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: 14px;
+  margin: -8px 0 18px;
+}
+.composer > small {
+  display: block;
+  color: var(--muted);
+  margin-top: 12px;
+}
+.post-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+.post-card > div {
+  display: flex;
+  justify-content: space-between;
+}
+.post-card > div small,
+.post-card footer > span {
+  color: var(--muted);
+}
+.post-card > p {
+  min-height: 55px;
+  line-height: 1.55;
+}
+.post-card footer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.post-card footer > span {
+  margin-right: auto;
+}
+.locked-note {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  background: #30351f;
+  color: #dfe9b5;
+  padding: 14px 18px;
+  border-radius: 14px;
+  margin-bottom: 18px;
+}
+.locked-note p {
+  margin: 0;
+}
+.menu-editor {
+  display: grid;
+  grid-template-columns: 1.2fr 2fr 1fr 1.4fr 0.7fr 1.2fr auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 18px;
+}
+.menu-editor h2 {
+  font: 29px "Bebas Neue";
+  margin: 4px 0;
+}
+.menu-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.menu-editor input,
+.menu-editor textarea {
+  background: var(--panel2);
+  border: 1px solid #454648;
+  color: white;
+  border-radius: 9px;
+  padding: 11px;
+  min-width: 0;
+}
+.menu-editor textarea {
+  height: 58px;
+}
+.menu-editor button {
+  border: 0;
+  border-radius: 9px;
+  background: var(--lime);
+  padding: 12px;
+  font-weight: 800;
+}
+.menu-editor .check {
+  flex-direction: row;
+  align-items: center;
+}
+.menu-category {
+  margin: 26px 0;
+}
+.menu-category > h2 {
+  font: 30px "Bebas Neue";
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+.menu-row {
+  display: grid;
+  grid-template-columns: 48px 1fr 80px 90px auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.menu-thumb {
+  width: 45px;
+  height: 45px;
+  border-radius: 12px;
+  background: var(--pink);
+  color: var(--lime);
+  display: grid;
+  place-items: center;
+  font: 24px "Bebas Neue";
+}
+.menu-row > div:nth-child(2) {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.menu-row span,
+.menu-row small {
+  color: var(--muted);
+}
+.menu-row small {
+  font-size: 11px;
+}
+.menu-row em {
+  font-style: normal;
+  color: #f3bf65;
+  font-size: 11px;
+}
+.menu-row button {
+  border: 0;
+  background: transparent;
+  color: var(--lime);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.venue-profile {
+  display: grid;
+  grid-template-columns: 1.3fr 0.7fr;
+  gap: 14px;
+}
+.profile-section {
+  min-width: 0;
+}
+.cover-upload {
+  min-height: 150px;
+  border: 1px dashed #555;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #aaa;
+  gap: 7px;
+  margin-bottom: 20px;
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+}
+.cover-upload svg {
+  color: var(--lime);
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.form-grid input,
+.form-grid textarea,
+.hours-row input {
+  background: var(--panel2);
+  border: 1px solid #454648;
+  color: white;
+  border-radius: 9px;
+  padding: 12px;
+}
+.form-grid textarea {
+  min-height: 90px;
+}
+.form-grid .wide {
+  grid-column: 1/-1;
+}
+.hours-section h2 {
+  font: 27px "Bebas Neue";
+  margin: 4px 0;
+}
+.hours-row {
+  display: grid;
+  grid-template-columns: 85px 1fr 18px 1fr 75px;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+}
+.hours-row .check {
+  display: flex;
+  gap: 5px;
+}
+.special-hours {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #30351f;
+  padding: 13px;
+  border-radius: 12px;
+  margin-top: 16px;
+}
+.special-hours > div {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+}
+.special-hours span {
+  color: var(--muted);
+}
+.special-hours button {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--lime);
+}
+.save-profile {
+  grid-column: 1/-1;
+  border: 0;
+  border-radius: 12px;
+  background: var(--lime);
+  padding: 14px;
+  font-weight: 800;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
 .loading {
   min-height: 100vh;
   display: grid;
@@ -965,6 +1423,19 @@ textarea {
   }
   .venue-editor {
     grid-template-columns: 1fr;
+  }
+  .post-list,
+  .venue-profile {
+    grid-template-columns: 1fr;
+  }
+  .menu-editor {
+    grid-template-columns: 1fr;
+  }
+  .menu-row {
+    grid-template-columns: 45px 1fr auto;
+  }
+  .menu-row > em {
+    grid-column: 2;
   }
   .venue-cards {
     grid-template-columns: 1fr;

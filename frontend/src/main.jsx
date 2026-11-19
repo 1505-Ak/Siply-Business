@@ -7,10 +7,13 @@ import {
   ChevronRight,
   Coffee,
   Gift,
+  ImagePlus,
   LayoutDashboard,
+  LockKeyhole,
   LogOut,
   MapPin,
   Pause,
+  Pencil,
   Play,
   Megaphone,
   Search,
@@ -18,7 +21,9 @@ import {
   Settings,
   ShieldCheck,
   Store,
+  Trash2,
   TrendingUp,
+  Utensils,
   Users,
 } from "lucide-react";
 import "./styles.css";
@@ -130,12 +135,29 @@ function Login({ onLogin }) {
 }
 
 const nav = [
-  ["overview", "Overview", LayoutDashboard],
-  ["venues", "My venues", Store],
-  ["claim", "Claim a venue", MapPin],
-  ["customers", "Customers", Users],
-  ["promotions", "Offers", Megaphone],
-  ["settings", "Business settings", Settings],
+  [
+    "INSIGHTS",
+    [
+      ["overview", "Overview", LayoutDashboard],
+      ["customers", "Customers", Users],
+    ],
+  ],
+  [
+    "MANAGE",
+    [
+      ["posts", "Posts", Megaphone],
+      ["promotions", "Offers", Gift],
+      ["menu", "Menu", Utensils],
+      ["venue", "My venue", Store],
+    ],
+  ],
+  [
+    "ACCOUNT",
+    [
+      ["claim", "Claim a venue", MapPin],
+      ["settings", "Business settings", Settings],
+    ],
+  ],
 ];
 function Shell({ business, onLogout }) {
   const [page, setPage] = useState("overview");
@@ -154,15 +176,20 @@ function Shell({ business, onLogout }) {
           </p>
         </div>
         <nav>
-          {nav.map(([id, label, Icon]) => (
-            <button
-              className={page === id ? "active" : ""}
-              onClick={() => setPage(id)}
-              key={id}
-            >
-              <Icon size={18} />
-              {label}
-            </button>
+          {nav.map(([group, items]) => (
+            <div className="nav-group" key={group}>
+              <span>{group}</span>
+              {items.map(([id, label, Icon]) => (
+                <button
+                  className={page === id ? "active" : ""}
+                  onClick={() => setPage(id)}
+                  key={id}
+                >
+                  <Icon size={18} />
+                  {label}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
         <button className="logout" onClick={onLogout}>
@@ -172,13 +199,17 @@ function Shell({ business, onLogout }) {
       </aside>
       <main className="content">
         {page === "overview" ? (
-          <Dashboard />
+          <Dashboard business={business} />
         ) : page === "claim" ? (
           <Claim />
-        ) : page === "venues" ? (
-          <Venues />
+        ) : page === "venue" ? (
+          <VenueProfile />
+        ) : page === "posts" ? (
+          <Posts />
+        ) : page === "menu" ? (
+          <Menu />
         ) : page === "customers" ? (
-          <Customers />
+          <Customers business={business} />
         ) : page === "promotions" ? (
           <Promotions />
         ) : page === "settings" ? (
@@ -206,7 +237,7 @@ function Metric({ label, value, delta, Icon }) {
     </article>
   );
 }
-function Dashboard() {
+function Dashboard({ business }) {
   const [data, setData] = useState(null),
     [period, setPeriod] = useState("30d");
   useEffect(() => {
@@ -245,7 +276,7 @@ function Dashboard() {
           View public listing <ChevronRight size={15} />
         </button>
       </div>
-      <section className="metrics">
+      <section className="metrics free-metrics">
         <Metric
           label="Profile views"
           value={money(s.profileViews)}
@@ -253,25 +284,35 @@ function Dashboard() {
           Icon={BarChart3}
         />
         <Metric
+          label="Menu views"
+          value={money(s.mapActions)}
+          delta="Guests exploring your menu"
+          Icon={Utensils}
+        />
+        <Metric
           label="Drink logs"
           value={money(s.drinkLogs)}
           delta="12.1% vs previous"
           Icon={Coffee}
         />
-        <Metric
-          label="Unique visitors"
-          value={money(s.uniqueVisitors)}
-          delta="9.8% vs previous"
-          Icon={Users}
-        />
-        <Metric
-          label="Average rating"
-          value={s.averageRating + "/5"}
-          delta="Top 8% locally"
-          Icon={TrendingUp}
-        />
       </section>
-      <section className="grid">
+      <section
+        className={
+          "grid pro-area " + (business.plan === "Free" ? "locked" : "")
+        }
+      >
+        {business.plan === "Free" && (
+          <div className="pro-lock">
+            <LockKeyhole size={28} />
+            <span className="eyebrow">SIPLY PRO</span>
+            <h2>Understand what brings guests back.</h2>
+            <p>
+              Unlock unique visitors, ratings, activity trends, local rank and
+              returning-customer insights.
+            </p>
+            <button>Explore Pro</button>
+          </div>
+        )}
         <article className="panel chart">
           <div className="panel-head">
             <div>
@@ -386,7 +427,11 @@ function Claim() {
   const [q, setQ] = useState(""),
     [items, setItems] = useState([]),
     [selected, setSelected] = useState(null),
+    [history, setHistory] = useState([]),
     [sent, setSent] = useState(false);
+  useEffect(() => {
+    request("/claims").then(setHistory);
+  }, []);
   const search = () =>
     request("/venues/search?q=" + encodeURIComponent(q)).then(setItems);
   const submit = async (e) => {
@@ -436,12 +481,21 @@ function Claim() {
       </header>
       <div className="claim-layout">
         <section className="panel claim-search">
-          <div className="steps">
-            <span className={selected ? "done" : "active"}>1</span>
+          <div className="steps named-steps">
+            <div>
+              <span className={selected ? "done" : "active"}>1</span>
+              <b>Find venue</b>
+            </div>
             <i />
-            <span className={selected ? "active" : ""}>2</span>
+            <div>
+              <span className={selected ? "active" : ""}>2</span>
+              <b>Verify</b>
+            </div>
             <i />
-            <span>3</span>
+            <div>
+              <span>3</span>
+              <b>Submit</b>
+            </div>
           </div>
           <label className="search">
             <Search size={19} />
@@ -526,6 +580,541 @@ function Claim() {
           )}
         </section>
       </div>
+      <section className="panel claim-history">
+        <div className="panel-head">
+          <div>
+            <span>CLAIM HISTORY</span>
+            <h2>Your claims</h2>
+          </div>
+        </div>
+        {history.map((x) => (
+          <div className="claim-row" key={x.id}>
+            <div>
+              <strong>{x.venue_name}</strong>
+              <span>
+                {new Date(x.submitted_at).toLocaleDateString("en-GB")}
+              </span>
+            </div>
+            <em className={`status ${x.status}`}>{x.status}</em>
+          </div>
+        ))}
+      </section>
+    </>
+  );
+}
+
+function Posts() {
+  const [posts, setPosts] = useState([]),
+    [type, setType] = useState("update"),
+    [editing, setEditing] = useState(null),
+    [photo, setPhoto] = useState(null),
+    [links, setLinks] = useState({ menu: [], offers: [] }),
+    [linked, setLinked] = useState(""),
+    [body, setBody] = useState("");
+  const load = () =>
+    Promise.all([
+      request("/posts"),
+      request("/menu"),
+      request("/promotions"),
+    ]).then(([p, m, o]) => {
+      setPosts(p);
+      setLinks({ menu: m, offers: o.filter((x) => x.status === "active") });
+    });
+  useEffect(() => {
+    load();
+  }, []);
+  const publish = async () => {
+    if (!body.trim()) return;
+    if (editing) {
+      await request(`/posts/${editing}`, {
+        method: "PUT",
+        body: JSON.stringify({ body }),
+      });
+    } else {
+      await request("/posts", {
+        method: "POST",
+        body: JSON.stringify({
+          type,
+          body,
+          linked_item_id: linked || null,
+          photo_url: photo,
+        }),
+      });
+    }
+    setBody("");
+    setPhoto(null);
+    setLinked("");
+    setEditing(null);
+    await load();
+  };
+  const remove = async (id) => {
+    if (!confirm("Delete this post?")) return;
+    await request(`/posts/${id}`, { method: "DELETE" });
+    await load();
+  };
+  const labels = {
+    update: "Update",
+    new_drink: "New drink",
+    event: "Event",
+    offer: "Offer",
+  };
+  return (
+    <>
+      <header>
+        <div>
+          <span className="eyebrow">COMMUNITY</span>
+          <h1>Posts.</h1>
+          <p>Share venue news with followers and people nearby.</p>
+        </div>
+      </header>
+      <section className="panel composer">
+        <div className="composer-tabs">
+          {Object.entries(labels).map(([id, label]) => (
+            <button
+              className={type === id ? "active" : ""}
+              onClick={() => setType(id)}
+              key={id}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <textarea
+          value={body}
+          maxLength={500}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder={`Write a ${labels[type].toLowerCase()}…`}
+        />
+        {type === "new_drink" && (
+          <label className="composer-link">
+            Link a menu item
+            <select value={linked} onChange={(e) => setLinked(e.target.value)}>
+              <option value="">Choose an item</option>
+              {links.menu.map((x) => (
+                <option value={x.id} key={x.id}>
+                  {x.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {type === "offer" && (
+          <label className="composer-link">
+            Link an active offer
+            <select value={linked} onChange={(e) => setLinked(e.target.value)}>
+              <option value="">Choose an offer</option>
+              {links.offers.map((x) => (
+                <option value={x.id} key={x.id}>
+                  {x.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <div className="composer-foot">
+          <label className="photo-action">
+            <ImagePlus size={17} />
+            {photo ? "Photo added" : "Add photo"}
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => setPhoto(reader.result);
+                reader.readAsDataURL(file);
+              }}
+            />
+          </label>
+          <span>{body.length}/500</span>
+          <button className="primary-action" onClick={publish}>
+            {editing ? "Save changes" : "Post to Siply"}
+          </button>
+        </div>
+        <small>
+          Posts appear on your venue and in the Community feed, labelled as a
+          venue post.
+        </small>
+      </section>
+      {photo && <img className="post-preview" src={photo} alt="Post preview" />}
+      <section className="post-list">
+        {posts.map((x) => (
+          <article className="panel post-card" key={x.id}>
+            <div>
+              <span className="status">{labels[x.type]}</span>
+              <small>
+                {new Date(x.created_at).toLocaleDateString("en-GB")}
+              </small>
+            </div>
+            <p>{x.body}</p>
+            <footer>
+              <span>{x.views} views</span>
+              <button
+                onClick={() => {
+                  setEditing(x.id);
+                  setBody(x.body);
+                  setType(x.type);
+                }}
+              >
+                <Pencil size={15} />
+                Edit
+              </button>
+              <button onClick={() => remove(x.id)}>
+                <Trash2 size={15} />
+                Delete
+              </button>
+            </footer>
+          </article>
+        ))}
+      </section>
+    </>
+  );
+}
+
+function Menu() {
+  const [items, setItems] = useState([]),
+    [editing, setEditing] = useState(null),
+    [saved, setSaved] = useState(false);
+  const load = () => request("/menu").then(setItems);
+  useEffect(() => {
+    load();
+  }, []);
+  const save = async (e) => {
+    e.preventDefault();
+    await request(`/menu/${editing.id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        description: e.target.description.value,
+        price_pence: Math.round(Number(e.target.price.value) * 100),
+        unavailable: e.target.unavailable.checked,
+        allergens: e.target.allergens.value
+          .split(",")
+          .map((x) => x.trim())
+          .filter(Boolean),
+        abv: e.target.abv.value ? Number(e.target.abv.value) : null,
+        photo_url: null,
+      }),
+    });
+    setSaved(true);
+    await load();
+    setTimeout(() => setSaved(false), 1500);
+  };
+  const groups = items.reduce(
+    (a, x) => ((a[x.category] ??= []).push(x), a),
+    {},
+  );
+  return (
+    <>
+      <header>
+        <div>
+          <span className="eyebrow">MENU</span>
+          <h1>Your drinks, kept consistent.</h1>
+          <p>
+            Names and categories stay locked so guest logs and ratings remain
+            attached to the same item.
+          </p>
+        </div>
+        <button className="secondary-action">Import menu</button>
+      </header>
+      <div className="locked-note">
+        <LockKeyhole size={18} />
+        <p>
+          <strong>Menu identity is locked after setup.</strong> You can still
+          update price, description, availability, allergens, ABV and photo.
+        </p>
+      </div>
+      {editing && (
+        <form className="panel menu-editor" onSubmit={save}>
+          <div>
+            <span className="eyebrow">EDIT ITEM</span>
+            <h2>{editing.name}</h2>
+            <small>{editing.category} · identity locked</small>
+          </div>
+          <label>
+            Description
+            <textarea name="description" defaultValue={editing.description} />
+          </label>
+          <label>
+            Price (£)
+            <input
+              name="price"
+              type="number"
+              step="0.01"
+              defaultValue={(editing.price_pence / 100).toFixed(2)}
+            />
+          </label>
+          <label>
+            Allergens
+            <input
+              name="allergens"
+              defaultValue={JSON.parse(editing.allergens).join(", ")}
+              placeholder="Milk, Egg, Sulphites"
+            />
+          </label>
+          <label>
+            ABV %
+            <input
+              name="abv"
+              type="number"
+              step="0.1"
+              defaultValue={editing.abv ?? ""}
+            />
+          </label>
+          <label className="check">
+            <input
+              name="unavailable"
+              type="checkbox"
+              defaultChecked={!!editing.unavailable}
+            />
+            Temporarily unavailable
+          </label>
+          <button>{saved ? "Saved" : "Save item"}</button>
+        </form>
+      )}
+      {Object.entries(groups).map(([category, list]) => (
+        <section className="menu-category" key={category}>
+          <h2>{category}</h2>
+          {list.map((x) => (
+            <article className="menu-row" key={x.id}>
+              <div className="menu-thumb">{x.name[0]}</div>
+              <div>
+                <strong>{x.name}</strong>
+                <span>{x.description || "No description yet"}</span>
+                <small>
+                  {JSON.parse(x.allergens).length
+                    ? "Contains: " + JSON.parse(x.allergens).join(", ")
+                    : "No allergens listed"}
+                  {x.abv ? ` · ${x.abv}% ABV` : ""}
+                </small>
+              </div>
+              <b>£{(x.price_pence / 100).toFixed(2)}</b>
+              {x.unavailable ? <em>Unavailable</em> : null}
+              <button
+                onClick={() => {
+                  setEditing(x);
+                  setSaved(false);
+                }}
+              >
+                <Pencil size={15} />
+                Edit
+              </button>
+            </article>
+          ))}
+        </section>
+      ))}
+    </>
+  );
+}
+
+function VenueProfile() {
+  const [v, setV] = useState(null),
+    [saved, setSaved] = useState(false),
+    [cover, setCover] = useState(null);
+  useEffect(() => {
+    request("/venue-profile").then(setV);
+  }, []);
+  if (!v) return <div className="loading">Opening your venue…</div>;
+  const days = [
+    ["mon", "Monday"],
+    ["tue", "Tuesday"],
+    ["wed", "Wednesday"],
+    ["thu", "Thursday"],
+    ["fri", "Friday"],
+    ["sat", "Saturday"],
+    ["sun", "Sunday"],
+  ];
+  const submit = async (e) => {
+    e.preventDefault();
+    const hours = {};
+    days.forEach(
+      ([id]) =>
+        (hours[id] = {
+          closed: e.target[`${id}_closed`].checked,
+          open: e.target[`${id}_open`].value,
+          close: e.target[`${id}_close`].value,
+        }),
+    );
+    await request("/venue-profile", {
+      method: "PUT",
+      body: JSON.stringify({
+        username: e.target.username.value,
+        category: e.target.category.value,
+        address: e.target.address.value,
+        city: e.target.city.value,
+        postcode: e.target.postcode.value,
+        phone: e.target.phone.value,
+        email: e.target.email.value,
+        website: e.target.website.value,
+        instagram: e.target.instagram.value,
+        tiktok: e.target.tiktok.value,
+        description: e.target.description.value,
+        tags: e.target.tags.value
+          .split(",")
+          .map((x) => x.trim())
+          .filter(Boolean),
+        opening_hours: hours,
+        cover_image: cover || v.cover_image,
+      }),
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+  return (
+    <>
+      <header>
+        <div>
+          <span className="eyebrow">PUBLIC PROFILE</span>
+          <h1>My venue.</h1>
+          <p>Control what guests see for this verified location.</p>
+        </div>
+        <button className="secondary-action">View public listing</button>
+      </header>
+      <form className="venue-profile" onSubmit={submit}>
+        <section className="panel profile-section">
+          <label
+            className="cover-upload"
+            style={
+              cover || v.cover_image
+                ? {
+                    backgroundImage: `linear-gradient(#0006,#0006),url(${cover || v.cover_image})`,
+                  }
+                : undefined
+            }
+          >
+            <ImagePlus size={26} />
+            <strong>Upload cover image</strong>
+            <span>Crop and preview before publishing</span>
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => setCover(reader.result);
+                reader.readAsDataURL(file);
+              }}
+            />
+          </label>
+          <div className="form-grid">
+            <label>
+              Username
+              <input name="username" defaultValue={v.username} />
+            </label>
+            <label>
+              Venue name
+              <input value={v.name} disabled />
+            </label>
+            <label>
+              Category
+              <input name="category" defaultValue={v.category} />
+            </label>
+            <label>
+              Phone
+              <input name="phone" defaultValue={v.phone} />
+            </label>
+            <label>
+              Address
+              <input name="address" defaultValue={v.address} />
+            </label>
+            <label>
+              City
+              <input name="city" defaultValue={v.city} />
+            </label>
+            <label>
+              Postcode
+              <input name="postcode" defaultValue={v.postcode} />
+            </label>
+            <label>
+              Email
+              <input name="email" type="email" defaultValue={v.email} />
+            </label>
+            <label>
+              Website
+              <input name="website" defaultValue={v.website} />
+            </label>
+            <label>
+              Instagram
+              <input name="instagram" defaultValue={v.instagram} />
+            </label>
+            <label>
+              TikTok
+              <input name="tiktok" defaultValue={v.tiktok} />
+            </label>
+            <label className="wide">
+              Description
+              <textarea name="description" defaultValue={v.description} />
+            </label>
+            <label className="wide">
+              Venue tags
+              <input
+                name="tags"
+                defaultValue={v.tags.join(", ")}
+                placeholder="Outdoor seating, Dog friendly, Live music"
+              />
+            </label>
+          </div>
+        </section>
+        <section className="panel hours-section">
+          <div className="panel-head">
+            <div>
+              <span>OPENING HOURS</span>
+              <h2>When guests can visit</h2>
+            </div>
+            <button type="button" className="text-action">
+              Copy Monday to all
+            </button>
+          </div>
+          {days.map(([id, label]) => {
+            const h = v.opening_hours[id] || {
+              open: "09:00",
+              close: "17:00",
+              closed: false,
+            };
+            return (
+              <div className="hours-row" key={id}>
+                <strong>{label}</strong>
+                <input
+                  name={`${id}_open`}
+                  type="time"
+                  defaultValue={h.open}
+                  disabled={h.closed}
+                />
+                <span>to</span>
+                <input
+                  name={`${id}_close`}
+                  type="time"
+                  defaultValue={h.close}
+                  disabled={h.closed}
+                />
+                <label className="check">
+                  <input
+                    name={`${id}_closed`}
+                    type="checkbox"
+                    defaultChecked={h.closed}
+                  />
+                  Closed
+                </label>
+              </div>
+            );
+          })}
+          <div className="special-hours">
+            <CalendarDays />
+            <div>
+              <strong>Special and bank holiday hours</strong>
+              <span>Add exceptions without changing your regular week.</span>
+            </div>
+            <button type="button">Add date</button>
+          </div>
+        </section>
+        <button className="save-profile">
+          {saved ? "Saved successfully" : "Save venue profile"}
+          <Save size={17} />
+        </button>
+      </form>
     </>
   );
 }
@@ -629,7 +1218,7 @@ function Venues() {
   );
 }
 
-function Customers() {
+function Customers({ business }) {
   const [data, setData] = useState(null);
   useEffect(() => {
     request("/customers").then(setData);
@@ -660,66 +1249,83 @@ function Customers() {
           </p>
         </div>
       </header>
-      <section className="metrics compact-metrics">
-        {cards.map(([label, value, note]) => (
-          <article className="metric" key={label}>
-            <div>
-              <span>{label}</span>
-              <Users size={19} />
-            </div>
-            <strong>{value}</strong>
-            <small>{note}</small>
-          </article>
-        ))}
-      </section>
-      <section className="customer-grid">
-        <article className="panel">
-          <div className="panel-head">
-            <div>
-              <span>AUDIENCE SEGMENTS</span>
-              <h2>Who to bring back</h2>
-            </div>
-          </div>
-          {data.segments.map((x) => (
-            <div className="segment-row" key={x.name}>
-              <div>
-                <strong>{x.name}</strong>
-                <span>{x.description}</span>
-              </div>
-              <b>{x.count}</b>
-              <em className={x.change < 0 ? "down" : "up"}>
-                {x.change > 0 ? "+" : ""}
-                {x.change}%
-              </em>
-            </div>
-          ))}
-        </article>
-        <article className="panel">
-          <div className="panel-head">
-            <div>
-              <span>LAST 30 DAYS</span>
-              <h2>Guest actions</h2>
-            </div>
-          </div>
-          {data.activity.map((x) => (
-            <div className="activity-row" key={x.label}>
-              <span>{x.label}</span>
-              <div className="line">
-                <i style={{ width: Math.min(100, x.count) + "%" }} />
-              </div>
-              <strong>{x.count}</strong>
-            </div>
-          ))}
-          <div className="privacy-note">
-            <ShieldCheck size={20} />
+      <div
+        className={"customer-pro " + (business.plan === "Free" ? "locked" : "")}
+      >
+        {business.plan === "Free" && (
+          <div className="pro-lock">
+            <LockKeyhole size={28} />
+            <span className="eyebrow">SIPLY PRO</span>
+            <h2>Know your regulars, without knowing their identities.</h2>
             <p>
-              <strong>Built for trust.</strong>
-              <br />
-              Siply only shows aggregated trends—never private guest identities.
+              Unlock customer segments, guest actions and return-rate trends
+              once your venue has enough aggregated data.
             </p>
+            <button>Explore Pro</button>
           </div>
-        </article>
-      </section>
+        )}
+        <section className="metrics compact-metrics">
+          {cards.map(([label, value, note]) => (
+            <article className="metric" key={label}>
+              <div>
+                <span>{label}</span>
+                <Users size={19} />
+              </div>
+              <strong>{value}</strong>
+              <small>{note}</small>
+            </article>
+          ))}
+        </section>
+        <section className="customer-grid">
+          <article className="panel">
+            <div className="panel-head">
+              <div>
+                <span>AUDIENCE SEGMENTS</span>
+                <h2>Who to bring back</h2>
+              </div>
+            </div>
+            {data.segments.map((x) => (
+              <div className="segment-row" key={x.name}>
+                <div>
+                  <strong>{x.name}</strong>
+                  <span>{x.description}</span>
+                </div>
+                <b>{x.count}</b>
+                <em className={x.change < 0 ? "down" : "up"}>
+                  {x.change > 0 ? "+" : ""}
+                  {x.change}%
+                </em>
+              </div>
+            ))}
+          </article>
+          <article className="panel">
+            <div className="panel-head">
+              <div>
+                <span>LAST 30 DAYS</span>
+                <h2>Guest actions</h2>
+              </div>
+            </div>
+            {data.activity.map((x) => (
+              <div className="activity-row" key={x.label}>
+                <span>{x.label}</span>
+                <div className="line">
+                  <i style={{ width: Math.min(100, x.count) + "%" }} />
+                </div>
+                <strong>{x.count}</strong>
+              </div>
+            ))}
+            <div className="privacy-note">
+              <ShieldCheck size={20} />
+              <p>
+                <strong>Built for trust.</strong>
+                <br />
+                Siply only shows aggregated trends—never private guest
+                identities.
+              </p>
+            </div>
+          </article>
+        </section>
+      </div>
     </>
   );
 }
@@ -728,6 +1334,7 @@ function Promotions() {
   const [offers, setOffers] = useState([]),
     [venues, setVenues] = useState([]),
     [open, setOpen] = useState(false),
+    [template, setTemplate] = useState(""),
     [message, setMessage] = useState("");
   const load = () =>
     Promise.all([request("/promotions"), request("/venues")]).then(([a, b]) => {
@@ -747,8 +1354,10 @@ function Promotions() {
           venue_id: e.target.venue.value,
           title: e.target.title.value,
           offer: e.target.offer.value,
-          starts_at: e.target.starts.value,
+          starts_at: new Date().toISOString().slice(0, 10),
           ends_at: e.target.ends.value,
+          tag: e.target.tag.value,
+          share_to_feed: e.target.share.checked,
         }),
       });
       setOpen(false);
@@ -782,19 +1391,30 @@ function Promotions() {
             <span className="eyebrow">NEW OFFER</span>
             <h2>Plan a promotion</h2>
           </div>
-          <label>
-            Venue
-            <select name="venue">
-              {venues.map((v) => (
-                <option value={v.id} key={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <input type="hidden" name="venue" value={venues[0]?.id || ""} />
+          <div className="offer-templates">
+            <span>Start with a template</span>
+            {[
+              "Happy hour",
+              "Student night",
+              "2-for-1",
+              "Meal deal",
+              "Free item with purchase",
+            ].map((x) => (
+              <button type="button" onClick={() => setTemplate(x)} key={x}>
+                {x}
+              </button>
+            ))}
+          </div>
           <label>
             Campaign name
-            <input name="title" required placeholder="Tuesday pick-me-up" />
+            <input
+              name="title"
+              required
+              placeholder="Tuesday pick-me-up"
+              value={template}
+              onChange={(e) => setTemplate(e.target.value)}
+            />
           </label>
           <label>
             Guest offer
@@ -805,12 +1425,21 @@ function Promotions() {
             />
           </label>
           <label>
-            Starts
-            <input name="starts" type="date" required />
+            Optional end date
+            <input name="ends" type="date" />
           </label>
           <label>
-            Ends
-            <input name="ends" type="date" required />
+            Offer tag
+            <select name="tag">
+              <option>Happy hour</option>
+              <option>Student</option>
+              <option>Food deal</option>
+              <option>Event</option>
+              <option>Other</option>
+            </select>
+          </label>
+          <label className="check">
+            <input name="share" type="checkbox" /> Also share to Community feed
           </label>
           {message && <div className="error">{message}</div>}
           <button>
@@ -830,12 +1459,13 @@ function Promotions() {
             <article className="panel offer-card" key={x.id}>
               <div className="offer-top">
                 <span className={"status " + x.status}>{x.status}</span>
-                <CalendarDays size={18} />
+                <span>{x.tag || "Offer"}</span>
               </div>
               <h2>{x.title}</h2>
               <p>{x.offer}</p>
               <small>
-                {x.starts_at} → {x.ends_at}
+                Live from {x.starts_at}
+                {x.ends_at ? ` · Ends ${x.ends_at}` : " · No end date"}
               </small>
               <div className="offer-stats">
                 <div>
@@ -847,8 +1477,12 @@ function Promotions() {
                   <span>Saves</span>
                 </div>
                 <div>
-                  <strong>{x.redemptions}</strong>
-                  <span>Redemptions</span>
+                  <strong>{x.redemptions || "—"}</strong>
+                  <span>
+                    {x.redemptions
+                      ? "Redemptions"
+                      : "Redemption tracking unavailable"}
+                  </span>
                 </div>
               </div>
               <button
@@ -959,6 +1593,10 @@ function BusinessSettings({ business }) {
             <span>Plan</span>
             <strong>{business.plan}</strong>
           </div>
+          <button className="upgrade-button">
+            <LockKeyhole size={16} />
+            Upgrade to Pro
+          </button>
           <div>
             <span>Access</span>
             <strong>Verified partner</strong>
@@ -972,6 +1610,10 @@ function BusinessSettings({ business }) {
             <p>
               Venue and customer analytics are restricted to approved locations.
             </p>
+          </div>
+          <div className="account-actions">
+            <button>Export my business data</button>
+            <button className="danger-text">Delete business account</button>
           </div>
         </article>
       </section>

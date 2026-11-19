@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -17,7 +18,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3400", "http
 
 
 def db():
-    connection = sqlite3.connect(DB_PATH)
+    connection = sqlite3.connect(DB_PATH, check_same_thread=False)
     connection.row_factory = sqlite3.Row
     try:
         yield connection
@@ -42,8 +43,15 @@ def setup() -> None:
         CREATE TABLE IF NOT EXISTS claims (id TEXT PRIMARY KEY, business_id TEXT NOT NULL, venue_id TEXT NOT NULL, role TEXT NOT NULL, evidence_type TEXT NOT NULL, evidence_note TEXT, status TEXT NOT NULL, submitted_at TEXT NOT NULL, reviewed_at TEXT);
         CREATE TABLE IF NOT EXISTS promotions (id TEXT PRIMARY KEY, business_id TEXT NOT NULL, venue_id TEXT NOT NULL, title TEXT NOT NULL, offer TEXT NOT NULL, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL, status TEXT NOT NULL, views INTEGER NOT NULL DEFAULT 0, saves INTEGER NOT NULL DEFAULT 0, redemptions INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS business_settings (business_id TEXT PRIMARY KEY, contact_name TEXT NOT NULL, phone TEXT, digest_frequency TEXT NOT NULL DEFAULT 'weekly', marketing_opt_in INTEGER NOT NULL DEFAULT 1);
+        CREATE TABLE IF NOT EXISTS posts (id TEXT PRIMARY KEY, business_id TEXT NOT NULL, venue_id TEXT NOT NULL, type TEXT NOT NULL, body TEXT NOT NULL, photo_url TEXT, linked_item_id TEXT, status TEXT NOT NULL, views INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS menu_items (id TEXT PRIMARY KEY, venue_id TEXT NOT NULL, category TEXT NOT NULL, name TEXT NOT NULL, description TEXT, price_pence INTEGER NOT NULL, unavailable INTEGER NOT NULL DEFAULT 0, allergens TEXT NOT NULL DEFAULT '[]', abv REAL, photo_url TEXT, locked INTEGER NOT NULL DEFAULT 1);
+        CREATE TABLE IF NOT EXISTS venue_profiles (venue_id TEXT PRIMARY KEY, username TEXT NOT NULL, phone TEXT, email TEXT, website TEXT, instagram TEXT, tiktok TEXT, description TEXT, tags TEXT NOT NULL DEFAULT '[]', opening_hours TEXT NOT NULL DEFAULT '{}', cover_image TEXT);
         """)
+        for statement in ("ALTER TABLE promotions ADD COLUMN tag TEXT", "ALTER TABLE promotions ADD COLUMN share_to_feed INTEGER NOT NULL DEFAULT 0"):
+            try: c.execute(statement)
+            except sqlite3.OperationalError: pass
         c.execute("INSERT OR IGNORE INTO businesses VALUES (?,?,?,?,?,?,?)", ("biz-northstar", "North Star Coffee", "North Star Coffee Ltd", "owner@northstarcoffee.co.uk", hash_password("SiplyBusiness!"), "Growth", now()))
+        c.execute("UPDATE businesses SET plan='Free' WHERE id='biz-northstar' AND plan='Growth'")
         venues = [
             ("venue-northstar", "North Star Coffee", "Specialty coffee", "44 Queen Street", "Glasgow", "G1 3DS", 55.8609, -4.2514, 1),
             ("venue-lime-tap", "The Lime Tap", "Cocktail bar", "12 Merchant Lane", "Glasgow", "G1 1AA", 55.8586, -4.2462, 0),
@@ -53,7 +61,21 @@ def setup() -> None:
         c.executemany("INSERT OR IGNORE INTO venues VALUES (?,?,?,?,?,?,?,?,?)", venues)
         c.execute("INSERT OR IGNORE INTO claims VALUES (?,?,?,?,?,?,?,?,?)", ("claim-approved", "biz-northstar", "venue-northstar", "Owner", "business_email", "Domain email verified", "approved", now(), now()))
         c.execute("INSERT OR IGNORE INTO business_settings VALUES (?,?,?,?,?)", ("biz-northstar", "Venue Owner", "+44 141 555 0132", "weekly", 1))
-        c.execute("INSERT OR IGNORE INTO promotions VALUES (?,?,?,?,?,?,?,?,?,?,?)", ("promo-welcome", "biz-northstar", "venue-northstar", "Tuesday pick-me-up", "20% off any hot drink after 2pm", "2026-11-17", "2026-12-17", "active", 684, 91, 34))
+        c.execute("UPDATE business_settings SET contact_name='Ashoka' WHERE business_id='biz-northstar' AND contact_name='Venue Owner'")
+        c.execute("INSERT OR IGNORE INTO promotions (id,business_id,venue_id,title,offer,starts_at,ends_at,status,views,saves,redemptions,tag,share_to_feed) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", ("promo-welcome", "biz-northstar", "venue-northstar", "Tuesday pick-me-up", "20% off any hot drink after 2pm", "2026-11-17", "2026-12-17", "active", 684, 91, 34, "Happy hour", 1))
+        c.execute("INSERT OR IGNORE INTO venue_profiles VALUES (?,?,?,?,?,?,?,?,?,?,?)", ("venue-northstar", "northstarcoffee", "+44 141 555 0132", "hello@northstarcoffee.example", "https://northstarcoffee.example", "northstarcoffee", "", "Independent specialty coffee, seasonal drinks and a warm Glasgow welcome.", json.dumps(["Dog friendly", "Outdoor seating", "Wi-Fi"]), json.dumps({d:{"closed": d=="mon", "open":"08:00", "close":"17:00"} for d in ["mon","tue","wed","thu","fri","sat","sun"]}), None))
+        menu = [
+            ("menu-flat-white","venue-northstar","Coffee","Flat White","Double espresso with silky steamed milk",380,0,"[\"Milk\"]",None,None,1),
+            ("menu-espresso","venue-northstar","Coffee","Espresso","House espresso, served short",280,0,"[]",None,None,1),
+            ("menu-matcha","venue-northstar","Seasonal","Iced Matcha","Ceremonial matcha, oat milk and ice",450,0,"[]",None,None,1),
+            ("menu-ginger","venue-northstar","Soft drinks","Fever-Tree Ginger Beer","",320,0,"[]",0.0,None,1),
+        ]
+        c.executemany("INSERT OR IGNORE INTO menu_items VALUES (?,?,?,?,?,?,?,?,?,?,?)", menu)
+        posts = [
+            ("post-welcome","biz-northstar","venue-northstar","new_drink","Our iced matcha is back for the season.",None,"menu-matcha","published",184,now(),now()),
+            ("post-weekend","biz-northstar","venue-northstar","update","Weekend opening hours are now live—come say hello.",None,None,"published",121,now(),now()),
+        ]
+        c.executemany("INSERT OR IGNORE INTO posts VALUES (?,?,?,?,?,?,?,?,?,?,?)", posts)
 
 
 setup()
@@ -76,7 +98,9 @@ class PromotionCreate(BaseModel):
     title: str = Field(min_length=3, max_length=80)
     offer: str = Field(min_length=3, max_length=160)
     starts_at: str
-    ends_at: str
+    ends_at: str = ""
+    tag: Literal["Happy hour", "Student", "Food deal", "Event", "Other"] = "Other"
+    share_to_feed: bool = False
 
 
 class PromotionStatus(BaseModel):
@@ -95,6 +119,43 @@ class SettingsUpdate(BaseModel):
     phone: str = Field(max_length=30)
     digest_frequency: Literal["daily", "weekly", "monthly", "off"]
     marketing_opt_in: bool
+
+
+class PostCreate(BaseModel):
+    type: Literal["update", "new_drink", "event", "offer"]
+    body: str = Field(min_length=1, max_length=500)
+    linked_item_id: str | None = None
+    photo_url: str | None = None
+
+
+class PostUpdate(BaseModel):
+    body: str = Field(min_length=1, max_length=500)
+
+
+class MenuUpdate(BaseModel):
+    description: str = Field(max_length=500)
+    price_pence: int = Field(ge=0, le=100000)
+    unavailable: bool
+    allergens: list[str] = []
+    abv: float | None = Field(default=None, ge=0, le=100)
+    photo_url: str | None = None
+
+
+class VenueProfileUpdate(BaseModel):
+    username: str = Field(min_length=3, max_length=40)
+    category: str = Field(min_length=2, max_length=80)
+    address: str = Field(min_length=3, max_length=140)
+    city: str = Field(min_length=2, max_length=80)
+    postcode: str = Field(min_length=2, max_length=16)
+    phone: str = Field(max_length=30)
+    email: EmailStr
+    website: str = Field(max_length=200)
+    instagram: str = Field(max_length=80)
+    tiktok: str = Field(max_length=80)
+    description: str = Field(max_length=1000)
+    tags: list[str]
+    opening_hours: dict
+    cover_image: str | None = None
 
 
 def current_business(authorization: str | None = Header(default=None), connection=Depends(db)):
@@ -186,7 +247,7 @@ def create_promotion(payload: PromotionCreate, connection=Depends(db), business=
     approved = connection.execute("SELECT 1 FROM claims WHERE business_id=? AND venue_id=? AND status='approved'", (business["id"], payload.venue_id)).fetchone()
     if not approved: raise HTTPException(403, "Only approved venue owners can publish offers")
     promo_id = f"promo-{secrets.token_hex(6)}"
-    connection.execute("INSERT INTO promotions VALUES (?,?,?,?,?,?,?,?,?,?,?)", (promo_id, business["id"], payload.venue_id, payload.title, payload.offer, payload.starts_at, payload.ends_at, "draft", 0, 0, 0)); connection.commit()
+    connection.execute("INSERT INTO promotions (id,business_id,venue_id,title,offer,starts_at,ends_at,status,views,saves,redemptions,tag,share_to_feed) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", (promo_id, business["id"], payload.venue_id, payload.title, payload.offer, payload.starts_at, payload.ends_at, "draft", 0, 0, 0, payload.tag, int(payload.share_to_feed))); connection.commit()
     return {"id": promo_id, "status": "draft"}
 
 
@@ -214,6 +275,63 @@ def customers(connection=Depends(db), business=Depends(current_business)):
             {"label": "Redeemed an offer", "count": 34}, {"label": "Left a rating", "count": 27},
         ],
     }
+
+
+@app.get("/api/posts")
+def posts(connection=Depends(db), business=Depends(current_business)):
+    return [dict(row) for row in connection.execute("SELECT * FROM posts WHERE business_id=? ORDER BY created_at DESC", (business["id"],)).fetchall()]
+
+
+@app.post("/api/posts", status_code=201)
+def create_post(payload: PostCreate, connection=Depends(db), business=Depends(current_business)):
+    venue = scoped_venues(connection, business["id"])
+    if not venue: raise HTTPException(403, "Claim a venue before posting")
+    post_id = f"post-{secrets.token_hex(6)}"
+    connection.execute("INSERT INTO posts VALUES (?,?,?,?,?,?,?,?,?,?,?)", (post_id,business["id"],venue[0]["id"],payload.type,payload.body,payload.photo_url,payload.linked_item_id,"published",0,now(),now())); connection.commit()
+    return {"id":post_id,"status":"published"}
+
+
+@app.put("/api/posts/{post_id}")
+def update_post(post_id: str, payload: PostUpdate, connection=Depends(db), business=Depends(current_business)):
+    if not connection.execute("SELECT 1 FROM posts WHERE id=? AND business_id=?",(post_id,business["id"])).fetchone(): raise HTTPException(404,"Post not found")
+    connection.execute("UPDATE posts SET body=?,updated_at=? WHERE id=?",(payload.body,now(),post_id)); connection.commit(); return {"saved":True}
+
+
+@app.delete("/api/posts/{post_id}", status_code=204)
+def delete_post(post_id: str, connection=Depends(db), business=Depends(current_business)):
+    connection.execute("DELETE FROM posts WHERE id=? AND business_id=?",(post_id,business["id"])); connection.commit()
+
+
+@app.get("/api/menu")
+def menu(connection=Depends(db), business=Depends(current_business)):
+    venues=scoped_venues(connection,business["id"])
+    if not venues:return []
+    return [dict(row) for row in connection.execute("SELECT * FROM menu_items WHERE venue_id=? ORDER BY category,name",(venues[0]["id"],)).fetchall()]
+
+
+@app.put("/api/menu/{item_id}")
+def update_menu_item(item_id: str,payload:MenuUpdate,connection=Depends(db),business=Depends(current_business)):
+    venues=scoped_venues(connection,business["id"]); ids=[v["id"] for v in venues]
+    row=connection.execute("SELECT * FROM menu_items WHERE id=?",(item_id,)).fetchone()
+    if not row or row["venue_id"] not in ids: raise HTTPException(404,"Menu item not found")
+    connection.execute("UPDATE menu_items SET description=?,price_pence=?,unavailable=?,allergens=?,abv=?,photo_url=? WHERE id=?",(payload.description,payload.price_pence,int(payload.unavailable),json.dumps(payload.allergens),payload.abv,payload.photo_url,item_id)); connection.commit(); return {"saved":True}
+
+
+@app.get("/api/venue-profile")
+def venue_profile(connection=Depends(db),business=Depends(current_business)):
+    venues=scoped_venues(connection,business["id"])
+    if not venues: raise HTTPException(404,"No verified venue")
+    venue=dict(venues[0]); profile=connection.execute("SELECT * FROM venue_profiles WHERE venue_id=?",(venue["id"],)).fetchone()
+    result={**venue,**dict(profile)}; result["tags"]=json.loads(result["tags"]); result["opening_hours"]=json.loads(result["opening_hours"]); return result
+
+
+@app.put("/api/venue-profile")
+def update_venue_profile(payload:VenueProfileUpdate,connection=Depends(db),business=Depends(current_business)):
+    venues=scoped_venues(connection,business["id"])
+    if not venues: raise HTTPException(404,"No verified venue")
+    venue_id=venues[0]["id"]
+    connection.execute("UPDATE venues SET category=?,address=?,city=?,postcode=? WHERE id=?",(payload.category,payload.address,payload.city,payload.postcode,venue_id))
+    connection.execute("UPDATE venue_profiles SET username=?,phone=?,email=?,website=?,instagram=?,tiktok=?,description=?,tags=?,opening_hours=?,cover_image=? WHERE venue_id=?",(payload.username,payload.phone,str(payload.email),payload.website,payload.instagram,payload.tiktok,payload.description,json.dumps(payload.tags),json.dumps(payload.opening_hours),payload.cover_image,venue_id)); connection.commit(); return {"saved":True}
 
 
 @app.get("/api/settings")
