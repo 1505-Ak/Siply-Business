@@ -42,6 +42,8 @@ const request = async (path, options = {}) => {
   return r.json();
 };
 const money = (n) => new Intl.NumberFormat("en-GB").format(n || 0);
+// Temporary launch-preview override. Set to false when Pro billing is enabled.
+const PRO_ACCESS_BYPASS = true;
 
 function Login({ onLogin }) {
   const [busy, setBusy] = useState(false),
@@ -298,10 +300,11 @@ function Dashboard({ business }) {
       </section>
       <section
         className={
-          "grid pro-area " + (business.plan === "Free" ? "locked" : "")
+          "grid pro-area " +
+          (business.plan === "Free" && !PRO_ACCESS_BYPASS ? "locked" : "")
         }
       >
-        {business.plan === "Free" && (
+        {business.plan === "Free" && !PRO_ACCESS_BYPASS && (
           <div className="pro-lock">
             <LockKeyhole size={28} />
             <span className="eyebrow">SIPLY PRO</span>
@@ -1250,9 +1253,12 @@ function Customers({ business }) {
         </div>
       </header>
       <div
-        className={"customer-pro " + (business.plan === "Free" ? "locked" : "")}
+        className={
+          "customer-pro " +
+          (business.plan === "Free" && !PRO_ACCESS_BYPASS ? "locked" : "")
+        }
       >
-        {business.plan === "Free" && (
+        {business.plan === "Free" && !PRO_ACCESS_BYPASS && (
           <div className="pro-lock">
             <LockKeyhole size={28} />
             <span className="eyebrow">SIPLY PRO</span>
