@@ -46,6 +46,7 @@ def setup() -> None:
         CREATE TABLE IF NOT EXISTS posts (id TEXT PRIMARY KEY, business_id TEXT NOT NULL, venue_id TEXT NOT NULL, type TEXT NOT NULL, body TEXT NOT NULL, photo_url TEXT, linked_item_id TEXT, status TEXT NOT NULL, views INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS menu_items (id TEXT PRIMARY KEY, venue_id TEXT NOT NULL, category TEXT NOT NULL, name TEXT NOT NULL, description TEXT, price_pence INTEGER NOT NULL, unavailable INTEGER NOT NULL DEFAULT 0, allergens TEXT NOT NULL DEFAULT '[]', abv REAL, photo_url TEXT, locked INTEGER NOT NULL DEFAULT 1);
         CREATE TABLE IF NOT EXISTS venue_profiles (venue_id TEXT PRIMARY KEY, username TEXT NOT NULL, phone TEXT, email TEXT, website TEXT, instagram TEXT, tiktok TEXT, description TEXT, tags TEXT NOT NULL DEFAULT '[]', opening_hours TEXT NOT NULL DEFAULT '{}', cover_image TEXT);
+        CREATE TABLE IF NOT EXISTS menu_imports (id TEXT PRIMARY KEY, business_id TEXT NOT NULL, venue_id TEXT NOT NULL, filename TEXT NOT NULL, content_type TEXT NOT NULL, file_data TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL);
         """)
         for statement in ("ALTER TABLE promotions ADD COLUMN tag TEXT", "ALTER TABLE promotions ADD COLUMN share_to_feed INTEGER NOT NULL DEFAULT 0", "ALTER TABLE menu_items ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0", "ALTER TABLE menu_items ADD COLUMN log_count INTEGER NOT NULL DEFAULT 0", "ALTER TABLE menu_items ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0"):
             try: c.execute(statement)
@@ -149,6 +150,12 @@ class MenuCreate(MenuUpdate):
 
 class MenuVisibility(BaseModel):
     hidden: bool
+
+
+class MenuImportCreate(BaseModel):
+    filename: str = Field(min_length=1, max_length=160)
+    content_type: str = Field(min_length=3, max_length=100)
+    file_data: str = Field(min_length=16, max_length=8_000_000)
 
 
 class VenueProfileUpdate(BaseModel):
@@ -357,6 +364,15 @@ def delete_menu_item(item_id:str,connection=Depends(db),business=Depends(current
     if not row or row["venue_id"] not in ids: raise HTTPException(404,"Menu item not found")
     if row["log_count"] or row["rating_count"]: raise HTTPException(409,"This item has guest activity and can only be hidden")
     connection.execute("DELETE FROM menu_items WHERE id=?",(item_id,));connection.commit()
+
+
+@app.post("/api/menu/import", status_code=202)
+def create_menu_import(payload:MenuImportCreate,connection=Depends(db),business=Depends(current_business)):
+    venues=scoped_venues(connection,business["id"])
+    if not venues: raise HTTPException(403,"No verified venue")
+    import_id=f"import-{secrets.token_hex(6)}"
+    connection.execute("INSERT INTO menu_imports VALUES (?,?,?,?,?,?,?,?)",(import_id,business["id"],venues[0]["id"],payload.filename,payload.content_type,payload.file_data,"queued",now()));connection.commit()
+    return {"id":import_id,"status":"queued","message":"Menu received for onboarding review"}
 
 
 @app.get("/api/venue-profile")

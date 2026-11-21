@@ -771,6 +771,8 @@ function Menu() {
     [editing, setEditing] = useState(null),
     [adding, setAdding] = useState(false),
     [error, setError] = useState(""),
+    [menuPhoto, setMenuPhoto] = useState(null),
+    [importMessage, setImportMessage] = useState(""),
     [saved, setSaved] = useState(false);
   const load = () => request("/menu").then(setItems);
   useEffect(() => {
@@ -789,7 +791,7 @@ function Menu() {
           .map((x) => x.trim())
           .filter(Boolean),
         abv: e.target.abv.value ? Number(e.target.abv.value) : null,
-        photo_url: null,
+        photo_url: menuPhoto || editing.photo_url,
       }),
     });
     setSaved(true);
@@ -813,14 +815,41 @@ function Menu() {
             .map((x) => x.trim())
             .filter(Boolean),
           abv: e.target.abv.value ? Number(e.target.abv.value) : null,
-          photo_url: null,
+          photo_url: menuPhoto,
         }),
       });
       setAdding(false);
+      setMenuPhoto(null);
       await load();
     } catch (x) {
       setError(x.message);
     }
+  };
+  const readPhoto = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setMenuPhoto(reader.result);
+    reader.readAsDataURL(file);
+  };
+  const importMenu = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const result = await request("/menu/import", {
+          method: "POST",
+          body: JSON.stringify({
+            filename: file.name,
+            content_type: file.type || "application/octet-stream",
+            file_data: reader.result,
+          }),
+        });
+        setImportMessage(result.message);
+      } catch (x) {
+        setError(x.message);
+      }
+    };
+    reader.readAsDataURL(file);
   };
   const visibility = async (x) => {
     await request(`/menu/${x.id}/visibility`, {
@@ -854,13 +883,28 @@ function Menu() {
           </p>
         </div>
         <div className="header-actions">
-          <button className="secondary-action">Import menu</button>
-          <button className="primary-action" onClick={() => setAdding(!adding)}>
+          <label className="secondary-action">
+            Import menu
+            <input
+              hidden
+              type="file"
+              accept=".csv,.pdf,image/*"
+              onChange={(e) => importMenu(e.target.files[0])}
+            />
+          </label>
+          <button
+            className="primary-action"
+            onClick={() => {
+              setAdding(!adding);
+              setMenuPhoto(null);
+            }}
+          >
             Add item
           </button>
         </div>
       </header>
       {error && <div className="error">{error}</div>}
+      {importMessage && <div className="success-note">{importMessage}</div>}
       {adding && (
         <form className="panel menu-add" onSubmit={add}>
           <label>
@@ -898,6 +942,14 @@ function Menu() {
           </label>
           <label>
             ABV %<input name="abv" type="number" step="0.1" />
+          </label>
+          <label>
+            Photo
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => readPhoto(e.target.files[0])}
+            />
           </label>
           <label className="check">
             <input name="unavailable" type="checkbox" />
@@ -958,6 +1010,14 @@ function Menu() {
             />
             Temporarily unavailable
           </label>
+          <label>
+            Photo
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => readPhoto(e.target.files[0])}
+            />
+          </label>
           <button>{saved ? "Saved" : "Save item"}</button>
         </form>
       )}
@@ -969,7 +1029,9 @@ function Menu() {
               className={`menu-row ${x.hidden ? "hidden-item" : ""}`}
               key={x.id}
             >
-              <div className="menu-thumb">{x.name[0]}</div>
+              <div className="menu-thumb">
+                {x.photo_url ? <img src={x.photo_url} alt="" /> : x.name[0]}
+              </div>
               <div>
                 <strong>
                   {x.name}
@@ -989,6 +1051,7 @@ function Menu() {
                 onClick={() => {
                   setEditing(x);
                   setSaved(false);
+                  setMenuPhoto(null);
                 }}
               >
                 <Pencil size={15} />
@@ -1306,19 +1369,101 @@ function VenueProfile() {
               </div>
             );
           })}
+          {(hours._special || []).map((s, index) => (
+            <div className="special-date" key={index}>
+              <input
+                type="date"
+                value={s.date}
+                onChange={(e) => {
+                  const list = [...(hours._special || [])];
+                  list[index] = { ...s, date: e.target.value };
+                  setHours({ ...hours, _special: list });
+                }}
+              />
+              <input
+                type="time"
+                value={s.open}
+                disabled={s.closed}
+                onChange={(e) => {
+                  const list = [...(hours._special || [])];
+                  list[index] = { ...s, open: e.target.value };
+                  setHours({ ...hours, _special: list });
+                }}
+              />
+              <span>to</span>
+              <input
+                type="time"
+                value={s.close}
+                disabled={s.closed}
+                onChange={(e) => {
+                  const list = [...(hours._special || [])];
+                  list[index] = { ...s, close: e.target.value };
+                  setHours({ ...hours, _special: list });
+                }}
+              />
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={s.closed}
+                  onChange={(e) => {
+                    const list = [...(hours._special || [])];
+                    list[index] = { ...s, closed: e.target.checked };
+                    setHours({ ...hours, _special: list });
+                  }}
+                />
+                Closed
+              </label>
+              <button
+                type="button"
+                onClick={() =>
+                  setHours({
+                    ...hours,
+                    _special: (hours._special || []).filter(
+                      (_, i) => i !== index,
+                    ),
+                  })
+                }
+              >
+                Remove
+              </button>
+            </div>
+          ))}
           <div className="special-hours">
             <CalendarDays />
             <div>
               <strong>Special and bank holiday hours</strong>
               <span>Add exceptions without changing your regular week.</span>
             </div>
-            <button type="button">Add date</button>
+            <button
+              type="button"
+              onClick={() =>
+                setHours({
+                  ...hours,
+                  _special: [
+                    ...(hours._special || []),
+                    { date: "", open: "09:00", close: "17:00", closed: false },
+                  ],
+                })
+              }
+            >
+              Add date
+            </button>
           </div>
         </section>
         <button className="save-profile">
           {saved ? "Saved successfully" : "Save venue profile"}
           <Save size={17} />
         </button>
+        {saved && (
+          <a
+            className="see-live"
+            href={`https://dev.siplyapp.co.uk/venue/${v.username}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            See it live
+          </a>
+        )}
       </form>
     </>
   );
