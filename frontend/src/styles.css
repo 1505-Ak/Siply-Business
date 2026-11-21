@@ -1,12 +1,12 @@
 @import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cormorant+Garamond:ital,wght@1,600&family=DM+Sans:wght@400;500;600;700&display=swap");
 :root {
-  --black: #261a1a;
-  --panel: #4a2e2a;
-  --panel2: #3b2523;
-  --lime: #d8ee3a;
-  --pink: #c34375;
+  --black: #141414;
+  --panel: #202123;
+  --panel2: #27282a;
+  --lime: #d0ff14;
+  --pink: #c43d7b;
   --muted: #b8b8b8;
-  --line: #67413c;
+  --line: #353638;
 }
 * {
   box-sizing: border-box;
@@ -179,7 +179,7 @@ textarea {
   padding: 24px 18px;
   display: flex;
   flex-direction: column;
-  background: #211717;
+  background: #191a1b;
 }
 .business-chip {
   display: flex;
