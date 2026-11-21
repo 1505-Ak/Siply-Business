@@ -29,6 +29,9 @@ import {
 import "./styles.css";
 
 const API = "http://localhost:8401/api";
+const LOCAL_AUTH_BYPASS =
+  import.meta.env.DEV &&
+  ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const request = async (path, options = {}) => {
   const r = await fetch(API + path, {
     ...options,
@@ -188,10 +191,12 @@ function Shell({ business, onLogout }) {
             </div>
           ))}
         </nav>
-        <button className="logout" onClick={onLogout}>
-          <LogOut size={17} />
-          Sign out
-        </button>
+        {onLogout && (
+          <button className="logout" onClick={onLogout}>
+            <LogOut size={17} />
+            Sign out
+          </button>
+        )}
       </aside>
       <main className="content">
         {page === "overview" ? (
@@ -1983,7 +1988,18 @@ function App() {
   useEffect(() => {
     request("/me")
       .then(setBusiness)
-      .catch(() => {})
+      .catch(async () => {
+        if (!LOCAL_AUTH_BYPASS) return;
+        const data = await request("/auth/login", {
+          method: "POST",
+          body: JSON.stringify({
+            email: "owner@northstarcoffee.co.uk",
+            password: "SiplyBusiness!",
+          }),
+        });
+        localStorage.siplyBusinessToken = data.token;
+        setBusiness(data.business);
+      })
       .finally(() => setLoading(false));
   }, []);
   if (loading) return <div className="loading">Opening Siply Business…</div>;
@@ -1991,10 +2007,14 @@ function App() {
   return (
     <Shell
       business={business}
-      onLogout={() => {
-        delete localStorage.siplyBusinessToken;
-        setBusiness(null);
-      }}
+      onLogout={
+        LOCAL_AUTH_BYPASS
+          ? null
+          : () => {
+              delete localStorage.siplyBusinessToken;
+              setBusiness(null);
+            }
+      }
     />
   );
 }
