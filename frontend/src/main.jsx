@@ -42,8 +42,8 @@ const request = async (path, options = {}) => {
   return r.json();
 };
 const money = (n) => new Intl.NumberFormat("en-GB").format(n || 0);
-// Temporary launch-preview override. Set to false when Pro billing is enabled.
-const PRO_ACCESS_BYPASS = true;
+const formatDate = (value) =>
+  value ? new Date(`${value}T12:00:00`).toLocaleDateString("en-GB") : "";
 
 function Login({ onLogin }) {
   const [busy, setBusy] = useState(false),
@@ -153,13 +153,7 @@ const nav = [
       ["venue", "My venue", Store],
     ],
   ],
-  [
-    "ACCOUNT",
-    [
-      ["claim", "Claim a venue", MapPin],
-      ["settings", "Business settings", Settings],
-    ],
-  ],
+  ["ACCOUNT", [["settings", "Business settings", Settings]]],
 ];
 function Shell({ business, onLogout }) {
   const [page, setPage] = useState("overview");
@@ -202,8 +196,6 @@ function Shell({ business, onLogout }) {
       <main className="content">
         {page === "overview" ? (
           <Dashboard business={business} />
-        ) : page === "claim" ? (
-          <Claim />
         ) : page === "venue" ? (
           <VenueProfile />
         ) : page === "posts" ? (
@@ -274,9 +266,13 @@ function Dashboard({ business }) {
             44 Queen Street, Glasgow · Verified venue
           </span>
         </div>
-        <button>
-          View public listing <ChevronRight size={15} />
-        </button>
+        <a
+          href="https://dev.siplyapp.co.uk/venue/northstarcoffee"
+          target="_blank"
+          rel="noreferrer"
+        >
+          View Siply Account <ChevronRight size={15} />
+        </a>
       </div>
       <section className="metrics free-metrics">
         <Metric
@@ -298,24 +294,7 @@ function Dashboard({ business }) {
           Icon={Coffee}
         />
       </section>
-      <section
-        className={
-          "grid pro-area " +
-          (business.plan === "Free" && !PRO_ACCESS_BYPASS ? "locked" : "")
-        }
-      >
-        {business.plan === "Free" && !PRO_ACCESS_BYPASS && (
-          <div className="pro-lock">
-            <LockKeyhole size={28} />
-            <span className="eyebrow">SIPLY PRO</span>
-            <h2>Understand what brings guests back.</h2>
-            <p>
-              Unlock unique visitors, ratings, activity trends, local rank and
-              returning-customer insights.
-            </p>
-            <button>Explore Pro</button>
-          </div>
-        )}
+      <section className="grid pro-area">
         <article className="panel chart">
           <div className="panel-head">
             <div>
@@ -342,39 +321,49 @@ function Dashboard({ business }) {
             ))}
           </div>
         </article>
-        <article className="panel audience">
-          <div className="panel-head">
-            <div>
-              <span>AUDIENCE</span>
-              <h2>Who came back</h2>
+        {business.plan === "Free" ? (
+          <article className="panel audience pro-coming">
+            <LockKeyhole size={28} />
+            <span className="eyebrow">SIPLY PRO</span>
+            <h2>Who came back</h2>
+            <p>Audience insights and repeat-customer trends.</p>
+            <button disabled>Pro coming soon</button>
+          </article>
+        ) : (
+          <article className="panel audience">
+            <div className="panel-head">
+              <div>
+                <span>AUDIENCE</span>
+                <h2>Who came back</h2>
+              </div>
             </div>
-          </div>
-          <div className="donut">
-            <div>
-              <strong>
-                {Math.round(
-                  (data.audience.returning /
-                    (data.audience.new + data.audience.returning)) *
-                    100,
-                )}
-                %
-              </strong>
-              <span>returning</span>
+            <div className="donut">
+              <div>
+                <strong>
+                  {Math.round(
+                    (data.audience.returning /
+                      (data.audience.new + data.audience.returning)) *
+                      100,
+                  )}
+                  %
+                </strong>
+                <span>returning</span>
+              </div>
             </div>
-          </div>
-          <div className="audience-row">
-            <span>New visitors</span>
-            <strong>{data.audience.new}</strong>
-          </div>
-          <div className="audience-row">
-            <span>Returning visitors</span>
-            <strong>{data.audience.returning}</strong>
-          </div>
-          <div className="audience-row">
-            <span>Siply followers</span>
-            <strong>{data.audience.followers}</strong>
-          </div>
-        </article>
+            <div className="audience-row">
+              <span>New visitors</span>
+              <strong>{data.audience.new}</strong>
+            </div>
+            <div className="audience-row">
+              <span>Returning visitors</span>
+              <strong>{data.audience.returning}</strong>
+            </div>
+            <div className="audience-row">
+              <span>Siply followers</span>
+              <strong>{data.audience.followers}</strong>
+            </div>
+          </article>
+        )}
         <article className="panel popular">
           <div className="panel-head">
             <div>
@@ -660,6 +649,7 @@ function Posts() {
     new_drink: "New drink",
     event: "Event",
     offer: "Offer",
+    other: "Other",
   };
   return (
     <>
@@ -779,6 +769,8 @@ function Posts() {
 function Menu() {
   const [items, setItems] = useState([]),
     [editing, setEditing] = useState(null),
+    [adding, setAdding] = useState(false),
+    [error, setError] = useState(""),
     [saved, setSaved] = useState(false);
   const load = () => request("/menu").then(setItems);
   useEffect(() => {
@@ -804,6 +796,48 @@ function Menu() {
     await load();
     setTimeout(() => setSaved(false), 1500);
   };
+  const add = async (e) => {
+    e.preventDefault();
+    setError("");
+    try {
+      await request("/menu", {
+        method: "POST",
+        body: JSON.stringify({
+          name: e.target.item_name.value,
+          category: e.target.category.value,
+          description: e.target.description.value,
+          price_pence: Math.round(Number(e.target.price.value) * 100),
+          unavailable: e.target.unavailable.checked,
+          allergens: e.target.allergens.value
+            .split(",")
+            .map((x) => x.trim())
+            .filter(Boolean),
+          abv: e.target.abv.value ? Number(e.target.abv.value) : null,
+          photo_url: null,
+        }),
+      });
+      setAdding(false);
+      await load();
+    } catch (x) {
+      setError(x.message);
+    }
+  };
+  const visibility = async (x) => {
+    await request(`/menu/${x.id}/visibility`, {
+      method: "PATCH",
+      body: JSON.stringify({ hidden: !x.hidden }),
+    });
+    await load();
+  };
+  const removeItem = async (x) => {
+    if (!confirm(`Permanently delete ${x.name}?`)) return;
+    try {
+      await request(`/menu/${x.id}`, { method: "DELETE" });
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
   const groups = items.reduce(
     (a, x) => ((a[x.category] ??= []).push(x), a),
     {},
@@ -819,8 +853,59 @@ function Menu() {
             attached to the same item.
           </p>
         </div>
-        <button className="secondary-action">Import menu</button>
+        <div className="header-actions">
+          <button className="secondary-action">Import menu</button>
+          <button className="primary-action" onClick={() => setAdding(!adding)}>
+            Add item
+          </button>
+        </div>
       </header>
+      {error && <div className="error">{error}</div>}
+      {adding && (
+        <form className="panel menu-add" onSubmit={add}>
+          <label>
+            Item name
+            <input name="item_name" required />
+          </label>
+          <label>
+            Category
+            <select name="category">
+              {[
+                "Coffee",
+                "Cocktails",
+                "Beer",
+                "Wine",
+                "Soft drinks",
+                "Mocktails",
+                "Food",
+                "Other",
+              ].map((x) => (
+                <option key={x}>{x}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Description
+            <textarea name="description" />
+          </label>
+          <label>
+            Price (£)
+            <input name="price" type="number" step="0.01" required />
+          </label>
+          <label>
+            Allergens
+            <input name="allergens" placeholder="Milk, Egg, Sulphites" />
+          </label>
+          <label>
+            ABV %<input name="abv" type="number" step="0.1" />
+          </label>
+          <label className="check">
+            <input name="unavailable" type="checkbox" />
+            Unavailable today
+          </label>
+          <button>Add and lock item</button>
+        </form>
+      )}
       <div className="locked-note">
         <LockKeyhole size={18} />
         <p>
@@ -880,10 +965,16 @@ function Menu() {
         <section className="menu-category" key={category}>
           <h2>{category}</h2>
           {list.map((x) => (
-            <article className="menu-row" key={x.id}>
+            <article
+              className={`menu-row ${x.hidden ? "hidden-item" : ""}`}
+              key={x.id}
+            >
               <div className="menu-thumb">{x.name[0]}</div>
               <div>
-                <strong>{x.name}</strong>
+                <strong>
+                  {x.name}
+                  {x.hidden ? " · Hidden" : ""}
+                </strong>
                 <span>{x.description || "No description yet"}</span>
                 <small>
                   {JSON.parse(x.allergens).length
@@ -903,6 +994,14 @@ function Menu() {
                 <Pencil size={15} />
                 Edit
               </button>
+              <button onClick={() => visibility(x)}>
+                {x.hidden ? "Unhide" : "Hide"}
+              </button>
+              {!x.log_count && !x.rating_count && (
+                <button className="danger-text" onClick={() => removeItem(x)}>
+                  Delete
+                </button>
+              )}
             </article>
           ))}
         </section>
@@ -914,9 +1013,13 @@ function Menu() {
 function VenueProfile() {
   const [v, setV] = useState(null),
     [saved, setSaved] = useState(false),
-    [cover, setCover] = useState(null);
+    [cover, setCover] = useState(null),
+    [hours, setHours] = useState({});
   useEffect(() => {
-    request("/venue-profile").then(setV);
+    request("/venue-profile").then((data) => {
+      setV(data);
+      setHours(data.opening_hours);
+    });
   }, []);
   if (!v) return <div className="loading">Opening your venue…</div>;
   const days = [
@@ -930,15 +1033,6 @@ function VenueProfile() {
   ];
   const submit = async (e) => {
     e.preventDefault();
-    const hours = {};
-    days.forEach(
-      ([id]) =>
-        (hours[id] = {
-          closed: e.target[`${id}_closed`].checked,
-          open: e.target[`${id}_open`].value,
-          close: e.target[`${id}_close`].value,
-        }),
-    );
     await request("/venue-profile", {
       method: "PUT",
       body: JSON.stringify({
@@ -972,7 +1066,14 @@ function VenueProfile() {
           <h1>My venue.</h1>
           <p>Control what guests see for this verified location.</p>
         </div>
-        <button className="secondary-action">View public listing</button>
+        <a
+          className="secondary-action"
+          href={`https://dev.siplyapp.co.uk/venue/${v.username}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          View Siply Account
+        </a>
       </header>
       <form className="venue-profile" onSubmit={submit}>
         <section className="panel profile-section">
@@ -1013,7 +1114,23 @@ function VenueProfile() {
             </label>
             <label>
               Category
-              <input name="category" defaultValue={v.category} />
+              <select name="category" defaultValue={v.category}>
+                {[
+                  "Café",
+                  "Specialty coffee",
+                  "Bubble tea",
+                  "Tearoom",
+                  "Cocktail bar",
+                  "Wine bar",
+                  "Pub",
+                  "Bar",
+                  "Restaurant",
+                  "Brewery or taproom",
+                  "Other",
+                ].map((x) => (
+                  <option key={x}>{x}</option>
+                ))}
+              </select>
             </label>
             <label>
               Phone
@@ -1067,40 +1184,125 @@ function VenueProfile() {
               <span>OPENING HOURS</span>
               <h2>When guests can visit</h2>
             </div>
-            <button type="button" className="text-action">
+            <button
+              type="button"
+              className="text-action"
+              disabled={hours.mon?.closed}
+              title={
+                hours.mon?.closed ? "Open Monday before copying its times" : ""
+              }
+              onClick={() => {
+                const m = hours.mon;
+                setHours(
+                  Object.fromEntries(
+                    days.map(([id]) => [
+                      id,
+                      {
+                        ...hours[id],
+                        open: m.open,
+                        close: m.close,
+                        open2: m.open2,
+                        close2: m.close2,
+                        split: m.split,
+                      },
+                    ]),
+                  ),
+                );
+              }}
+            >
               Copy Monday to all
             </button>
           </div>
           {days.map(([id, label]) => {
-            const h = v.opening_hours[id] || {
+            const h = hours[id] || {
               open: "09:00",
               close: "17:00",
               closed: false,
             };
             return (
-              <div className="hours-row" key={id}>
-                <strong>{label}</strong>
-                <input
-                  name={`${id}_open`}
-                  type="time"
-                  defaultValue={h.open}
-                  disabled={h.closed}
-                />
-                <span>to</span>
-                <input
-                  name={`${id}_close`}
-                  type="time"
-                  defaultValue={h.close}
-                  disabled={h.closed}
-                />
-                <label className="check">
-                  <input
-                    name={`${id}_closed`}
-                    type="checkbox"
-                    defaultChecked={h.closed}
-                  />
-                  Closed
-                </label>
+              <div className="hours-row-wrap" key={id}>
+                <div className="hours-row">
+                  <strong>{label}</strong>
+                  {!h.closed && (
+                    <>
+                      <input
+                        name={`${id}_open`}
+                        type="time"
+                        value={h.open}
+                        onChange={(e) =>
+                          setHours({
+                            ...hours,
+                            [id]: { ...h, open: e.target.value },
+                          })
+                        }
+                      />
+                      <span>to</span>
+                      <input
+                        name={`${id}_close`}
+                        type="time"
+                        value={h.close}
+                        onChange={(e) =>
+                          setHours({
+                            ...hours,
+                            [id]: { ...h, close: e.target.value },
+                          })
+                        }
+                      />
+                    </>
+                  )}
+                  <label className="check">
+                    <input
+                      name={`${id}_closed`}
+                      type="checkbox"
+                      checked={h.closed}
+                      onChange={(e) =>
+                        setHours({
+                          ...hours,
+                          [id]: { ...h, closed: e.target.checked },
+                        })
+                      }
+                    />
+                    Closed
+                  </label>
+                </div>
+                {!h.closed && (
+                  <div className="shift-tools">
+                    {h.close <= h.open && <span>Closes next day</span>}
+                    {h.split && (
+                      <>
+                        <input
+                          type="time"
+                          value={h.open2 || "14:00"}
+                          onChange={(e) =>
+                            setHours({
+                              ...hours,
+                              [id]: { ...h, open2: e.target.value },
+                            })
+                          }
+                        />
+                        <span>to</span>
+                        <input
+                          type="time"
+                          value={h.close2 || "17:00"}
+                          onChange={(e) =>
+                            setHours({
+                              ...hours,
+                              [id]: { ...h, close2: e.target.value },
+                            })
+                          }
+                        />
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setHours({ ...hours, [id]: { ...h, split: !h.split } })
+                      }
+                    >
+                      {h.split ? "Remove split" : "Add split shift"}
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1227,6 +1429,19 @@ function Customers({ business }) {
     request("/customers").then(setData);
   }, []);
   if (!data) return <div className="loading">Reading guest signals…</div>;
+  if (business.plan === "Free" || data.locked)
+    return (
+      <div className="full-pro-screen">
+        <LockKeyhole size={38} />
+        <span className="eyebrow">SIPLY PRO</span>
+        <h1>Know who comes back.</h1>
+        <p>
+          Customer segments, return rate, guest actions and repeat-customer
+          insights will be available with Siply Pro.
+        </p>
+        <button disabled>Pro coming soon</button>
+      </div>
+    );
   const cards = [
     [
       "Reachable guests",
@@ -1252,24 +1467,7 @@ function Customers({ business }) {
           </p>
         </div>
       </header>
-      <div
-        className={
-          "customer-pro " +
-          (business.plan === "Free" && !PRO_ACCESS_BYPASS ? "locked" : "")
-        }
-      >
-        {business.plan === "Free" && !PRO_ACCESS_BYPASS && (
-          <div className="pro-lock">
-            <LockKeyhole size={28} />
-            <span className="eyebrow">SIPLY PRO</span>
-            <h2>Know your regulars, without knowing their identities.</h2>
-            <p>
-              Unlock customer segments, guest actions and return-rate trends
-              once your venue has enough aggregated data.
-            </p>
-            <button>Explore Pro</button>
-          </div>
-        )}
+      <div className="customer-pro">
         <section className="metrics compact-metrics">
           {cards.map(([label, value, note]) => (
             <article className="metric" key={label}>
@@ -1470,8 +1668,10 @@ function Promotions() {
               <h2>{x.title}</h2>
               <p>{x.offer}</p>
               <small>
-                Live from {x.starts_at}
-                {x.ends_at ? ` · Ends ${x.ends_at}` : " · No end date"}
+                Live from {formatDate(x.starts_at)}
+                {x.ends_at
+                  ? ` · Ends ${formatDate(x.ends_at)}`
+                  : " · No end date"}
               </small>
               <div className="offer-stats">
                 <div>
@@ -1483,12 +1683,8 @@ function Promotions() {
                   <span>Saves</span>
                 </div>
                 <div>
-                  <strong>{x.redemptions || "—"}</strong>
-                  <span>
-                    {x.redemptions
-                      ? "Redemptions"
-                      : "Redemption tracking unavailable"}
-                  </span>
+                  <strong>{x.saves}</strong>
+                  <span>Taps</span>
                 </div>
               </div>
               <button
@@ -1599,9 +1795,9 @@ function BusinessSettings({ business }) {
             <span>Plan</span>
             <strong>{business.plan}</strong>
           </div>
-          <button className="upgrade-button">
+          <button className="upgrade-button" disabled>
             <LockKeyhole size={16} />
-            Upgrade to Pro
+            Pro coming soon
           </button>
           <div>
             <span>Access</span>

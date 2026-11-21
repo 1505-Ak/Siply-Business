@@ -15,9 +15,11 @@ Standalone venue-owner service for claiming a hospitality listing and managing i
 
 - **Insights:** Overview and Pro-gated Customers analytics
 - **Manage:** Posts, unlimited Offers, locked-identity Menu editing, and My venue profile/hours
-- **Account:** Three-step Claim flow with claim history, plus Business settings
+- **Account:** Business settings. Venue claiming now belongs to the main Siply website and is intentionally absent from this portal.
 
 Every login is scoped to one verified venue at launch. The Free plan includes claiming, venue editing, menus, posts and unlimited offers; only advanced behavioural analytics are presented as Siply Pro.
+
+Siply Pro is labelled **Coming soon**. There is no price or payment flow. Free accounts receive no audience or customer-segment payloads from the API.
 
 ## Local development
 

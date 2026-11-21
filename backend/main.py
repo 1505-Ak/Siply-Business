@@ -42,12 +42,12 @@ def setup() -> None:
         CREATE TABLE IF NOT EXISTS venues (id TEXT PRIMARY KEY, name TEXT NOT NULL, category TEXT NOT NULL, address TEXT NOT NULL, city TEXT NOT NULL, postcode TEXT, latitude REAL, longitude REAL, claimed INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS claims (id TEXT PRIMARY KEY, business_id TEXT NOT NULL, venue_id TEXT NOT NULL, role TEXT NOT NULL, evidence_type TEXT NOT NULL, evidence_note TEXT, status TEXT NOT NULL, submitted_at TEXT NOT NULL, reviewed_at TEXT);
         CREATE TABLE IF NOT EXISTS promotions (id TEXT PRIMARY KEY, business_id TEXT NOT NULL, venue_id TEXT NOT NULL, title TEXT NOT NULL, offer TEXT NOT NULL, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL, status TEXT NOT NULL, views INTEGER NOT NULL DEFAULT 0, saves INTEGER NOT NULL DEFAULT 0, redemptions INTEGER NOT NULL DEFAULT 0);
-        CREATE TABLE IF NOT EXISTS business_settings (business_id TEXT PRIMARY KEY, contact_name TEXT NOT NULL, phone TEXT, digest_frequency TEXT NOT NULL DEFAULT 'weekly', marketing_opt_in INTEGER NOT NULL DEFAULT 1);
+        CREATE TABLE IF NOT EXISTS business_settings (business_id TEXT PRIMARY KEY, contact_name TEXT NOT NULL, phone TEXT, digest_frequency TEXT NOT NULL DEFAULT 'weekly', marketing_opt_in INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS posts (id TEXT PRIMARY KEY, business_id TEXT NOT NULL, venue_id TEXT NOT NULL, type TEXT NOT NULL, body TEXT NOT NULL, photo_url TEXT, linked_item_id TEXT, status TEXT NOT NULL, views INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS menu_items (id TEXT PRIMARY KEY, venue_id TEXT NOT NULL, category TEXT NOT NULL, name TEXT NOT NULL, description TEXT, price_pence INTEGER NOT NULL, unavailable INTEGER NOT NULL DEFAULT 0, allergens TEXT NOT NULL DEFAULT '[]', abv REAL, photo_url TEXT, locked INTEGER NOT NULL DEFAULT 1);
         CREATE TABLE IF NOT EXISTS venue_profiles (venue_id TEXT PRIMARY KEY, username TEXT NOT NULL, phone TEXT, email TEXT, website TEXT, instagram TEXT, tiktok TEXT, description TEXT, tags TEXT NOT NULL DEFAULT '[]', opening_hours TEXT NOT NULL DEFAULT '{}', cover_image TEXT);
         """)
-        for statement in ("ALTER TABLE promotions ADD COLUMN tag TEXT", "ALTER TABLE promotions ADD COLUMN share_to_feed INTEGER NOT NULL DEFAULT 0"):
+        for statement in ("ALTER TABLE promotions ADD COLUMN tag TEXT", "ALTER TABLE promotions ADD COLUMN share_to_feed INTEGER NOT NULL DEFAULT 0", "ALTER TABLE menu_items ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0", "ALTER TABLE menu_items ADD COLUMN log_count INTEGER NOT NULL DEFAULT 0", "ALTER TABLE menu_items ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0"):
             try: c.execute(statement)
             except sqlite3.OperationalError: pass
         c.execute("INSERT OR IGNORE INTO businesses VALUES (?,?,?,?,?,?,?)", ("biz-northstar", "North Star Coffee", "North Star Coffee Ltd", "owner@northstarcoffee.co.uk", hash_password("SiplyBusiness!"), "Growth", now()))
@@ -70,7 +70,8 @@ def setup() -> None:
             ("menu-matcha","venue-northstar","Seasonal","Iced Matcha","Ceremonial matcha, oat milk and ice",450,0,"[]",None,None,1),
             ("menu-ginger","venue-northstar","Soft drinks","Fever-Tree Ginger Beer","",320,0,"[]",0.0,None,1),
         ]
-        c.executemany("INSERT OR IGNORE INTO menu_items VALUES (?,?,?,?,?,?,?,?,?,?,?)", menu)
+        c.executemany("INSERT OR IGNORE INTO menu_items (id,venue_id,category,name,description,price_pence,unavailable,allergens,abv,photo_url,locked) VALUES (?,?,?,?,?,?,?,?,?,?,?)", menu)
+        c.execute("UPDATE menu_items SET log_count=96,rating_count=24 WHERE id='menu-flat-white' AND log_count=0 AND rating_count=0")
         posts = [
             ("post-welcome","biz-northstar","venue-northstar","new_drink","Our iced matcha is back for the season.",None,"menu-matcha","published",184,now(),now()),
             ("post-weekend","biz-northstar","venue-northstar","update","Weekend opening hours are now live—come say hello.",None,None,"published",121,now(),now()),
@@ -122,7 +123,7 @@ class SettingsUpdate(BaseModel):
 
 
 class PostCreate(BaseModel):
-    type: Literal["update", "new_drink", "event", "offer"]
+    type: Literal["update", "new_drink", "event", "offer", "other"]
     body: str = Field(min_length=1, max_length=500)
     linked_item_id: str | None = None
     photo_url: str | None = None
@@ -139,6 +140,15 @@ class MenuUpdate(BaseModel):
     allergens: list[str] = []
     abv: float | None = Field(default=None, ge=0, le=100)
     photo_url: str | None = None
+
+
+class MenuCreate(MenuUpdate):
+    name: str = Field(min_length=2, max_length=100)
+    category: str = Field(min_length=2, max_length=80)
+
+
+class MenuVisibility(BaseModel):
+    hidden: bool
 
 
 class VenueProfileUpdate(BaseModel):
@@ -234,12 +244,15 @@ def dashboard(period: Literal["7d", "30d", "90d"] = "30d", connection=Depends(db
     base = {"profileViews": 2847, "mapActions": 936, "drinkLogs": 412, "uniqueVisitors": 318, "returningVisitors": 126, "saves": 227, "averageRating": 4.6, "posts": 184}
     summary = {key: round(value * multiplier) if isinstance(value, int) else value for key, value in base.items()}
     series = [{"label": f"W{i+1}", "views": round((480 + i*73 + (i%2)*120)*multiplier), "visits": round((58 + i*9)*multiplier)} for i in range(6)]
-    return {"venues": [dict(v) for v in venues], "period": period, "summary": summary, "series": series, "popular": [{"name":"Flat White","logs":96,"rating":4.8},{"name":"Iced Matcha","logs":73,"rating":4.7},{"name":"V60 Filter","logs":61,"rating":4.9},{"name":"Espresso","logs":48,"rating":4.5}], "busyHours":[{"day":"Saturday","time":"11:00–14:00","visits":74},{"day":"Friday","time":"15:00–18:00","visits":63},{"day":"Sunday","time":"10:00–13:00","visits":57}], "audience":{"new":192,"returning":126,"followers":584}}
+    return {"venues": [dict(v) for v in venues], "period": period, "summary": summary, "series": series, "popular": [{"name":"Flat White","logs":96,"rating":4.8},{"name":"Iced Matcha","logs":73,"rating":4.7},{"name":"V60 Filter","logs":61,"rating":4.9},{"name":"Espresso","logs":48,"rating":4.5}], "busyHours":[{"day":"Saturday","time":"11:00–14:00","visits":74},{"day":"Friday","time":"15:00–18:00","visits":63}], "audience": None if business["plan"] == "Free" else {"new":192,"returning":126,"followers":584}}
 
 
 @app.get("/api/promotions")
 def promotions(connection=Depends(db), business=Depends(current_business)):
-    return [dict(row) for row in connection.execute("SELECT * FROM promotions WHERE business_id=? ORDER BY starts_at DESC", (business["id"],)).fetchall()]
+    rows=[]
+    for row in connection.execute("SELECT * FROM promotions WHERE business_id=? ORDER BY starts_at DESC", (business["id"],)).fetchall():
+        item=dict(row); item.pop("redemptions", None); rows.append(item)
+    return rows
 
 
 @app.post("/api/promotions", status_code=201)
@@ -261,6 +274,7 @@ def update_promotion_status(promotion_id: str, payload: PromotionStatus, connect
 
 @app.get("/api/customers")
 def customers(connection=Depends(db), business=Depends(current_business)):
+    if business["plan"] == "Free": return {"locked": True}
     if not scoped_venues(connection, business["id"]): return {"segments": [], "activity": []}
     return {
         "summary": {"reachable": 584, "new_this_month": 72, "return_rate": 40, "average_visits": 2.7},
@@ -315,6 +329,34 @@ def update_menu_item(item_id: str,payload:MenuUpdate,connection=Depends(db),busi
     row=connection.execute("SELECT * FROM menu_items WHERE id=?",(item_id,)).fetchone()
     if not row or row["venue_id"] not in ids: raise HTTPException(404,"Menu item not found")
     connection.execute("UPDATE menu_items SET description=?,price_pence=?,unavailable=?,allergens=?,abv=?,photo_url=? WHERE id=?",(payload.description,payload.price_pence,int(payload.unavailable),json.dumps(payload.allergens),payload.abv,payload.photo_url,item_id)); connection.commit(); return {"saved":True}
+
+
+@app.post("/api/menu", status_code=201)
+def create_menu_item(payload:MenuCreate,connection=Depends(db),business=Depends(current_business)):
+    venues=scoped_venues(connection,business["id"])
+    if not venues: raise HTTPException(403,"No verified venue")
+    venue_id=venues[0]["id"]
+    duplicate=connection.execute("SELECT 1 FROM menu_items WHERE venue_id=? AND lower(name)=lower(?)",(venue_id,payload.name)).fetchone()
+    if duplicate: raise HTTPException(409,"A menu item with this name already exists")
+    item_id=f"menu-{secrets.token_hex(6)}"
+    connection.execute("INSERT INTO menu_items (id,venue_id,category,name,description,price_pence,unavailable,allergens,abv,photo_url,locked,hidden,log_count,rating_count) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",(item_id,venue_id,payload.category,payload.name,payload.description,payload.price_pence,int(payload.unavailable),json.dumps(payload.allergens),payload.abv,payload.photo_url,1,0,0,0));connection.commit();return {"id":item_id}
+
+
+@app.patch("/api/menu/{item_id}/visibility")
+def set_menu_visibility(item_id:str,payload:MenuVisibility,connection=Depends(db),business=Depends(current_business)):
+    venues=scoped_venues(connection,business["id"]); ids=[v["id"] for v in venues]
+    row=connection.execute("SELECT * FROM menu_items WHERE id=?",(item_id,)).fetchone()
+    if not row or row["venue_id"] not in ids: raise HTTPException(404,"Menu item not found")
+    connection.execute("UPDATE menu_items SET hidden=? WHERE id=?",(int(payload.hidden),item_id));connection.commit();return {"hidden":payload.hidden}
+
+
+@app.delete("/api/menu/{item_id}", status_code=204)
+def delete_menu_item(item_id:str,connection=Depends(db),business=Depends(current_business)):
+    venues=scoped_venues(connection,business["id"]); ids=[v["id"] for v in venues]
+    row=connection.execute("SELECT * FROM menu_items WHERE id=?",(item_id,)).fetchone()
+    if not row or row["venue_id"] not in ids: raise HTTPException(404,"Menu item not found")
+    if row["log_count"] or row["rating_count"]: raise HTTPException(409,"This item has guest activity and can only be hidden")
+    connection.execute("DELETE FROM menu_items WHERE id=?",(item_id,));connection.commit()
 
 
 @app.get("/api/venue-profile")
